@@ -1,0 +1,16 @@
+dependencies:
+  idf:
+    source:
+      type: idf
+    version: 5.5.2
+  nimble_peripheral_utils:
+    dependencies: []
+    source:
+      path: D:\Env\esp-idf\v5.5.2\esp-idf\examples\bluetooth\nimble\common\nimble_peripheral_utils
+      type: local
+    version: '*'
+direct_dependencies:
+- nimble_peripheral_utils
+manifest_hash: c28d41453286b749d7e5a8b76d4a8cdf22df54db4ac4384a3371eb4f67a0b54c
+target: esp32c61
+version: 2.0.0
