@@ -1,6 +1,7 @@
 #include "device.h"
 #include "pro2.h"
 #include "utils.h"
+#include "log.h"
 
 #include "esp_mac.h"
 #include "esp_log.h"

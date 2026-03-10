@@ -2,6 +2,7 @@
 #include "pro2.h"
 #include "protocol.h"
 #include "utils.h"
+#include "log.h"
 
 #include "esp_log.h"
 #include "host/ble_att.h"
