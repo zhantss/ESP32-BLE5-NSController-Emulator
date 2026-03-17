@@ -2,6 +2,10 @@
 #define _HID_H
 
 #include <stdint.h>
+#include <stdbool.h>
+
+#include "freertos/task.h"
+#include "freertos/queue.h"
 
 // HID Report Interval(ms)
 #define HID_REPORT_INTERVAL     15
@@ -66,12 +70,44 @@ typedef struct __attribute__((packed)) {
 
 static_assert(sizeof(pro2_hid_report_t) == 63);
 
+// Button event queue definitions
+typedef enum {
+    BUTTON_ACTION_PRESS,
+    BUTTON_ACTION_RELEASE
+} button_action_t;
+
+typedef struct {
+    pro2_btns button;
+    button_action_t action;
+} button_event_t;
+
+extern QueueHandle_t button_event_queue;
+
+// Button queue API
+void button_queue_init(void);
+bool button_queue_send(button_event_t *event);
+bool button_queue_receive(button_event_t *event);
+
+// HID Report Handle
+
+// pro2 hid report entity
+extern pro2_hid_report_t *pro2_hid_report;
+
+// hid task handle
+extern TaskHandle_t hid_task_handle;
+
+// hid report gatt handle
+extern uint16_t hid_report_gatt_handle;
+
+void hid_start_task(void);
+void hid_stop_task(void);
+
 // Pro2 Functions
 
 void pro2_report_init(pro2_hid_report_t *report);
 void pro2_set_left_stick(pro2_hid_report_t *report, uint16_t x, uint16_t y);
 void pro2_set_right_stick(pro2_hid_report_t *report, uint16_t x, uint16_t y);
-void pro2_set_button(pro2_hid_report_t *report, pro2_btns btn);
+void pro2_set_button(pro2_hid_report_t *report, pro2_btns btn, bool pressed);
 void pro2_press_button(pro2_hid_report_t *report, pro2_btns btn);
 void pro2_release_button(pro2_hid_report_t *report, pro2_btns btn);
 
