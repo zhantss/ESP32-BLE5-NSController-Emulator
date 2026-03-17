@@ -2,7 +2,6 @@
 #define _SYSTEM_H_
 
 #include <stdint.h>
-#include <stddef.h>
 
 #include "nimble/ble.h"
 #include "host/ble_gap.h"

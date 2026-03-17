@@ -1,8 +1,6 @@
 #include "device.h"
 #include "hid.h"
-#include "log.h"
-
-#include "esp_log.h"
+#include "utils.h"
 
 static void print_conn_desc(struct ble_gap_conn_desc* desc) {
   ESP_LOGI(LOG_BLE_GAP, "handle=%d our_ota_addr_type=%d our_ota_addr=", 
@@ -129,4 +127,5 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
     default:
       break;
   }
+  return 0;
 }

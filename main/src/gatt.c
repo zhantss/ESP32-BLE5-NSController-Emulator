@@ -3,8 +3,6 @@
 #include "protocol.h"
 #include "utils.h"
 
-#include "esp_log.h"
-
 // #region GATT UUID
 
 // https://github.com/ndeadly/switch2_controller_research/blob/master/bluetooth_interface.md#gatt-attributes
