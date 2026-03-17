@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 
 // HID Report Interval(ms)
 #define HID_REPORT_INTERVAL     15
@@ -69,24 +69,6 @@ typedef struct __attribute__((packed)) {
 } pro2_hid_report_t;
 
 static_assert(sizeof(pro2_hid_report_t) == 63);
-
-// Button event queue definitions
-typedef enum {
-    BUTTON_ACTION_PRESS,
-    BUTTON_ACTION_RELEASE
-} button_action_t;
-
-typedef struct {
-    pro2_btns button;
-    button_action_t action;
-} button_event_t;
-
-extern QueueHandle_t button_event_queue;
-
-// Button queue API
-void button_queue_init(void);
-bool button_queue_send(button_event_t *event);
-bool button_queue_receive(button_event_t *event);
 
 // HID Report Handle
 

@@ -1,19 +1,13 @@
 #include "hid.h"
 #include "device.h"
+#include "utils.h"
 
 #include <string.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
 
 // global hid report instance
 pro2_hid_report_t *pro2_hid_report = NULL;
 TaskHandle_t hid_task_handle = NULL;
 uint16_t hid_report_gatt_handle = 0x000e;
-
-// button event queue
-QueueHandle_t button_event_queue = NULL;
 
 // 12 bits stick data packed into 3 bytes
 static void pack_stick_data(uint8_t out[3], uint16_t x, uint16_t y) {
@@ -118,23 +112,7 @@ static void hid_task(void *arg) {
             // update report counter, wrap around 0-255
             pro2_hid_report->counter++;
 
-            // Process button events from queue
-            button_event_t event;
-            while (button_queue_receive(&event)) {
-                switch (event.action) {
-                    case BUTTON_ACTION_PRESS:
-                        pro2_press_button(pro2_hid_report, event.button);
-                        ESP_LOGD(LOG_HID, "Button pressed: %d", event.button);
-                        break;
-                    case BUTTON_ACTION_RELEASE:
-                        pro2_release_button(pro2_hid_report, event.button);
-                        ESP_LOGD(LOG_HID, "Button released: %d", event.button);
-                        break;
-                    default:
-                        ESP_LOGW(LOG_HID, "Unknown button action: %d", event.action);
-                        break;
-                }
-            }
+            // TODO Process button events from queue
 
             // send hid report
             int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
@@ -156,9 +134,6 @@ void hid_start_task(void) {
     }
 
     if (g_dev_controller.type == DEVICE_TYPE_PRO2) {
-        // Initialize button event queue
-        button_queue_init();
-
         // malloc hid report memory
         if (pro2_hid_report == NULL) {
             pro2_hid_report = (pro2_hid_report_t*)malloc(sizeof(pro2_hid_report_t));
@@ -192,55 +167,4 @@ void hid_stop_task(void) {
         free(pro2_hid_report);
         pro2_hid_report = NULL;
     }
-    // Note: button event queue is NOT deleted here because it may still be used by UART
-    // The queue will be cleaned up at application shutdown if needed
-}
-
-// ===================== Button Event Queue Implementation =====================
-
-void button_queue_init(void) {
-    if (button_event_queue == NULL) {
-        // Create a queue that can hold up to 32 button events
-        button_event_queue = xQueueCreate(32, sizeof(button_event_t));
-        if (button_event_queue == NULL) {
-            ESP_LOGE(LOG_HID, "Failed to create button event queue");
-        } else {
-            ESP_LOGI(LOG_HID, "Button event queue initialized, size: 32");
-        }
-    }
-}
-
-bool button_queue_send(button_event_t *event) {
-    if (button_event_queue == NULL || event == NULL) {
-        ESP_LOGE(LOG_HID, "Invalid arguments for button_queue_send");
-        return false;
-    }
-
-    BaseType_t result = xQueueSend(button_event_queue, event, 0);
-    if (result != pdPASS) {
-        ESP_LOGW(LOG_HID, "Failed to send button event to queue (queue full?)");
-        return false;
-    }
-
-    ESP_LOGD(LOG_HID, "Button event queued: button=%d, action=%s",
-             event->button,
-             event->action == BUTTON_ACTION_PRESS ? "PRESS" : "RELEASE");
-    return true;
-}
-
-bool button_queue_receive(button_event_t *event) {
-    if (button_event_queue == NULL || event == NULL) {
-        ESP_LOGE(LOG_HID, "Invalid arguments for button_queue_receive");
-        return false;
-    }
-
-    BaseType_t result = xQueueReceive(button_event_queue, event, 0);
-    if (result != pdPASS) {
-        return false;
-    }
-
-    ESP_LOGD(LOG_HID, "Button event dequeued: button=%d, action=%s",
-             event->button,
-             event->action == BUTTON_ACTION_PRESS ? "PRESS" : "RELEASE");
-    return true;
 }

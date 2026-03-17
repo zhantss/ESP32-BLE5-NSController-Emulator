@@ -1,6 +1,5 @@
 #include "device.h"
-
-#include "log.h"
+#include "utils.h"
 
 void log_print_ltk_hex(const char* data_name, const uint8_t *data) {
   ESP_LOGI(LOG_APP, "%s: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", 
