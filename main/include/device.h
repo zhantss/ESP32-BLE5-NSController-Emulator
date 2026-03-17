@@ -2,6 +2,7 @@
 #define _SYSTEM_H_
 
 #include <stdint.h>
+#include <stddef.h>
 
 #include "nimble/ble.h"
 #include "host/ble_gap.h"
@@ -10,7 +11,8 @@
 #include "uthash.h"
 
 // Log tags
-#define LOG_APP      "app"
+#define LOG_APP                 "app"
+#define LOG_HID                 "hid"
 #define LOG_BLE_LL              "ble_ll"
 #define LOG_BLE_GATT            "ble_gatt"
 #define LOG_BLE_GAP             "ble_gap"
