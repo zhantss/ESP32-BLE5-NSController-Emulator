@@ -215,7 +215,10 @@ void ble_advertise() {
   uint8_t m_spec[2] = { m_size, 0xFF };
   memcpy(m_data, m_head, sizeof(m_head));
   memcpy(m_data + sizeof(m_head), m_spec, sizeof(m_spec));
-  // TODO set wakeup flag
+  // TODO test wakeup flag
+  if (g_adv_opcode != 0x00) {
+    g_dev_controller.manufacturer_data[11] = g_adv_opcode;
+  }
   memcpy(m_data + sizeof(m_head) + sizeof(m_spec), g_dev_controller.manufacturer_data, sizeof(g_dev_controller.manufacturer_data));
 
   adv_data = os_msys_get_pkthdr(sizeof(m_data), 0);
