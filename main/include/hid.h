@@ -43,10 +43,33 @@ typedef struct {
 } pro2_btn_bits_t;
 
 typedef enum {
-    A, B, X, Y,
-    R, ZR, L, ZL, GR, GL,
-    Up, Down, Left, Right, LClick, RClick,
-    Plus, Minus, Home, Capture, C
+    // pro2_btn_bits_t Byte 0
+    B,      // bit 0
+    A,      // bit 1
+    Y,      // bit 2
+    X,      // bit 3
+    R,      // bit 4
+    ZR,     // bit 5
+    Plus,   // bit 6
+    RClick, // bit 7
+
+    // pro2_btn_bits_t Byte 1
+    Down,   // bit 0
+    Right,  // bit 1
+    Left,   // bit 2
+    Up,     // bit 3
+    L,      // bit 4
+    ZL,     // bit 5
+    Minus,  // bit 6
+    LClick, // bit 7
+
+    // pro2_btn_bits_t Byte 2
+    Home,   // bit 0
+    Capture,// bit 1
+    GR,     // bit 2
+    GL,     // bit 3
+    C,      // bit 4
+    // bit 5-7 reserved
 } pro2_btns;
 
 typedef struct {

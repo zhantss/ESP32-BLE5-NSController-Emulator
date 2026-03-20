@@ -4,6 +4,9 @@
 # docker extend
 .devcontainer/
 
+# ai
+.claude/
+
 # macOS
 .DS_Store
 .AppleDouble

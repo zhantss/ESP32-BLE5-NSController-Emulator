@@ -2,6 +2,8 @@
 #include "hid.h"
 #include "device.h"
 #include "utils.h"
+#include "uart_protocol.h"
+#include "uart_easycon.h"
 
 #include "driver/uart.h"
 #include "esp_log.h"
@@ -15,7 +17,10 @@ dev_uart_manager_t g_uart_manager = {
     .event_queue = NULL,
     .report_mutex = NULL,
     .uart_task_handle = NULL,
-    .initialized = false
+    .initialized = false,
+    .current_protocol = UART_PROTOCOL_SIMPLE,
+    .protocol_impl = NULL,
+    .protocol_stats = {0}
 };
 
 // Simple protocol format:
@@ -23,33 +28,84 @@ dev_uart_manager_t g_uart_manager = {
 #define UART_START_BYTE         0xAA
 #define UART_TYPE_BUTTON        0x01
 #define UART_TYPE_STICK         0x02
-#define UART_MAX_FRAME_SIZE     16
+// #define UART_MAX_FRAME_SIZE     16
 
-// Button mapping from UART ID to pro2_btns
-static const pro2_btns button_map[] = {
-    A,      // ID 0
-    B,      // ID 1
-    X,      // ID 2
-    Y,      // ID 3
-    L,      // ID 4
-    R,      // ID 5
-    ZL,     // ID 6
-    ZR,     // ID 7
-    Minus,  // ID 8
-    Plus,   // ID 9
-    LClick, // ID 10
-    RClick, // ID 11
-    Home,   // ID 12
-    Capture,// ID 13
-    Up,     // ID 14
-    Down,   // ID 15
-    Left,   // ID 16
-    Right,  // ID 17
-    GR,     // ID 18
-    GL,     // ID 19
-    C       // ID 20
+const pro2_btns button_map[] = {
+    // ID 0-7: 4 non-direction buttons in pro2_btn_bits_t byte 0
+    B,      // ID 0 (enum 0)
+    A,      // ID 1 (enum 1)
+    Y,      // ID 2 (enum 2)
+    X,      // ID 3 (enum 3)
+    R,      // ID 4 (enum 4)
+    ZR,     // ID 5 (enum 5)
+    Plus,   // ID 6 (enum 6)
+    RClick, // ID 7 (enum 7)
+
+    // ID 8-11: 4 non-direction buttons in pro2_btn_bits_t byte 1
+    L,      // ID 8 (enum 12) - skip Down,Right,Left,Up
+    ZL,     // ID 9 (enum 13)
+    Minus,  // ID 10 (enum 14)
+    LClick, // ID 11 (enum 15)
+
+    // ID 12-15: 4 buttons in pro2_btn_bits_t byte 2 (excluding C)
+    Home,   // ID 12 (enum 16)
+    Capture,// ID 13 (enum 17)
+    GR,     // ID 14 (enum 18)
+    GL,     // ID 15 (enum 19)
+
+    // Note: Direction buttons (Down,Right,Left,Up) and C button are not in button_map
+    // They are handled separately
 };
-#define BUTTON_MAP_SIZE (sizeof(button_map) / sizeof(button_map[0]))
+const size_t BUTTON_MAP_SIZE = 16;  // 16 non-direction, non-C buttons
+
+// Process HAT direction and update direction buttons
+static void process_hat_direction_internal(uint8_t hat_value) {
+    // Extract direction part (bit0-3)
+    uint8_t direction = hat_value & 0x0F;
+
+    // Process direction buttons
+    bool up_pressed = false, down_pressed = false, left_pressed = false, right_pressed = false;
+
+    switch (direction) {
+        case HAT_UP:           up_pressed = true; break;
+        case HAT_UP_RIGHT:     up_pressed = true; right_pressed = true; break;
+        case HAT_RIGHT:        right_pressed = true; break;
+        case HAT_DOWN_RIGHT:   down_pressed = true; right_pressed = true; break;
+        case HAT_DOWN:         down_pressed = true; break;
+        case HAT_DOWN_LEFT:    down_pressed = true; left_pressed = true; break;
+        case HAT_LEFT:         left_pressed = true; break;
+        case HAT_UP_LEFT:      up_pressed = true; left_pressed = true; break;
+        case HAT_CENTER:
+        default:
+            // All directions released
+            break;
+    }
+
+    // Update direction button states
+    pro2_set_button(pro2_hid_report, Up, up_pressed);
+    pro2_set_button(pro2_hid_report, Down, down_pressed);
+    pro2_set_button(pro2_hid_report, Left, left_pressed);
+    pro2_set_button(pro2_hid_report, Right, right_pressed);
+}
+
+// Process complete HID event
+static void process_hid_event(const hid_event_t* hid_event) {
+    // Process 16 non-direction, non-C buttons
+    for (int i = 0; i < 16; i++) {
+        if (i < BUTTON_MAP_SIZE) {
+            pro2_btns btn = button_map[i];
+            bool pressed = (hid_event->button_mask & (1 << i)) != 0;
+            pro2_set_button(pro2_hid_report, btn, pressed);
+        }
+    }
+
+    // Process HAT direction
+    process_hat_direction_internal(hid_event->hat_state);
+
+    // Process stick data
+    pro2_set_left_stick(pro2_hid_report, hid_event->left_stick_x, hid_event->left_stick_y);
+    pro2_set_right_stick(pro2_hid_report, hid_event->right_stick_x, hid_event->right_stick_y);
+}
 
 static uint8_t calculate_checksum(const uint8_t* data, size_t len) {
     uint8_t sum = 0;
@@ -60,60 +116,13 @@ static uint8_t calculate_checksum(const uint8_t* data, size_t len) {
 }
 
 dev_uart_event_type_t dev_uart_parse_frame(const uint8_t* data, size_t len, dev_uart_event_t* event) {
-    if (len < 4 || data[0] != UART_START_BYTE) {
+    // Use protocol abstraction layer
+    if (g_uart_manager.protocol_impl == NULL) {
+        ESP_LOGE(LOG_UART, "No protocol implementation selected");
         return UART_EVENT_UNKNOWN;
     }
 
-    uint8_t frame_type = data[1];
-    size_t data_len = len - 3; // Exclude start byte, type, and checksum
-
-    // Verify checksum
-    uint8_t checksum = calculate_checksum(data, len - 1);
-    if (checksum != data[len - 1]) {
-        ESP_LOGE(LOG_UART, "Checksum mismatch: expected 0x%02X, got 0x%02X", checksum, data[len - 1]);
-        return UART_EVENT_UNKNOWN;
-    }
-
-    switch (frame_type) {
-        case UART_TYPE_BUTTON:
-            if (data_len == 2) {
-                uint8_t button_id = data[2];
-                bool pressed = data[3] != 0;
-
-                if (button_id < BUTTON_MAP_SIZE) {
-                    event->type = UART_EVENT_BUTTON;
-                    event->data.button.button_id = button_id;
-                    event->data.button.pressed = pressed;
-                    ESP_LOGD(LOG_UART, "Button event: id=%d, pressed=%d", button_id, pressed);
-                    return UART_EVENT_BUTTON;
-                }
-            }
-            break;
-
-        case UART_TYPE_STICK:
-            if (data_len == 5) {
-                uint8_t stick_id = data[2];
-                uint16_t x = (data[3] << 8) | data[4];
-                uint16_t y = (data[5] << 8) | data[6];
-
-                // Validate stick coordinates (12-bit)
-                if (stick_id < 2 && x <= 0xFFF && y <= 0xFFF) {
-                    event->type = UART_EVENT_STICK;
-                    event->data.stick.stick_id = stick_id;
-                    event->data.stick.x = x;
-                    event->data.stick.y = y;
-                    ESP_LOGD(LOG_UART, "Stick event: id=%d, x=0x%03X, y=0x%03X", stick_id, x, y);
-                    return UART_EVENT_STICK;
-                }
-            }
-            break;
-
-        default:
-            ESP_LOGW(LOG_UART, "Unknown frame type: 0x%02X", frame_type);
-            break;
-    }
-
-    return UART_EVENT_UNKNOWN;
+    return uart_protocol_parse_frame(g_uart_manager.protocol_impl, data, len, event);
 }
 
 static void uart_rx_task(void *arg) {
@@ -121,6 +130,7 @@ static void uart_rx_task(void *arg) {
     uint8_t frame_buffer[UART_MAX_FRAME_SIZE];
     size_t frame_pos = 0;
     bool in_frame = false;
+    const uart_protocol_impl_t* current_impl = NULL;
 
     ESP_LOGI(LOG_UART, "UART RX task started");
 
@@ -130,46 +140,104 @@ static void uart_rx_task(void *arg) {
         if (len > 0) {
             ESP_LOGD(LOG_UART, "Received %d bytes", len);
 
+            // Get current protocol implementation
+            current_impl = g_uart_manager.protocol_impl;
+            if (current_impl == NULL) {
+                // Protocol not initialized yet, skip processing
+                vTaskDelay(1);
+                continue;
+            }
+
             for (int i = 0; i < len; i++) {
                 uint8_t byte = data[i];
 
-                if (!in_frame && byte == UART_START_BYTE) {
-                    // Start of new frame
-                    frame_pos = 0;
-                    frame_buffer[frame_pos++] = byte;
-                    in_frame = true;
-                    ESP_LOGD(LOG_UART, "Frame start detected");
+                if (!in_frame) {
+                    // Check if this byte could start a frame
+                    // We need to check with protocol detection
+                    uint8_t test_data[2] = {byte, 0};
+                    if (current_impl->detect_protocol != NULL &&
+                        current_impl->detect_protocol(test_data, 1)) {
+                        // Potential frame start
+                        frame_pos = 0;
+                        frame_buffer[frame_pos++] = byte;
+                        in_frame = true;
+                        ESP_LOGD(LOG_UART, "Potential frame start detected (0x%02X)", byte);
+                    }
                 } else if (in_frame) {
                     // Continue frame
                     if (frame_pos < UART_MAX_FRAME_SIZE) {
                         frame_buffer[frame_pos++] = byte;
 
-                        // TODO EasyCon Adapter
-                        
-                        // Simple frame completion detection:
-                        // Minimum frame size is 4 bytes, we check if we have enough data
-                        if (frame_pos >= 4) {
-                            dev_uart_event_t event;
-                            dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
+                        // Check if we have enough data to attempt parsing
+                        if (current_impl->get_expected_frame_size != NULL) {
+                            size_t expected_size = current_impl->get_expected_frame_size(frame_buffer, frame_pos);
 
-                            if (type != UART_EVENT_UNKNOWN) {
-                                // Valid frame, send to queue
-                                if (g_uart_manager.event_queue != NULL) {
-                                    if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
-                                        ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+                            if (expected_size > 0 && frame_pos >= expected_size) {
+                                // We have a complete frame (or enough to parse)
+                                dev_uart_event_t event;
+                                dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
+
+                                if (type != UART_EVENT_UNKNOWN) {
+                                    // Valid frame, send to queue
+                                    if (g_uart_manager.event_queue != NULL) {
+                                        if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
+                                            ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+                                        }
                                     }
+                                    in_frame = false;
+                                    frame_pos = 0;
+                                } else {
+                                    // Frame parsing failed
+                                    ESP_LOGD(LOG_UART, "Frame parsing failed, resetting");
+                                    in_frame = false;
+                                    frame_pos = 0;
                                 }
-                                in_frame = false;
-                            } else if (frame_pos >= UART_MAX_FRAME_SIZE) {
-                                // Frame too long or invalid
-                                ESP_LOGW(LOG_UART, "Invalid frame or frame too long");
-                                in_frame = false;
+                            } else if (expected_size == 0 && frame_pos >= 4) {
+                                // Protocol doesn't know expected size, try parsing anyway
+                                // (for protocols without get_expected_frame_size implementation)
+                                dev_uart_event_t event;
+                                dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
+
+                                if (type != UART_EVENT_UNKNOWN) {
+                                    // Valid frame
+                                    if (g_uart_manager.event_queue != NULL) {
+                                        if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
+                                            ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+                                        }
+                                    }
+                                    in_frame = false;
+                                    frame_pos = 0;
+                                }
+                            }
+                        } else {
+                            // Protocol doesn't have get_expected_frame_size function
+                            // Try parsing when we have at least minimum frame size
+                            if (frame_pos >= 4) {
+                                dev_uart_event_t event;
+                                dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
+
+                                if (type != UART_EVENT_UNKNOWN) {
+                                    // Valid frame
+                                    if (g_uart_manager.event_queue != NULL) {
+                                        if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
+                                            ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+                                        }
+                                    }
+                                    in_frame = false;
+                                    frame_pos = 0;
+                                } else if (frame_pos >= UART_MAX_FRAME_SIZE) {
+                                    // Frame too long
+                                    ESP_LOGW(LOG_UART, "Frame too long, resetting");
+                                    in_frame = false;
+                                    frame_pos = 0;
+                                }
                             }
                         }
                     } else {
                         // Frame too long
                         ESP_LOGW(LOG_UART, "Frame too long, resetting");
                         in_frame = false;
+                        frame_pos = 0;
                     }
                 }
             }
@@ -234,6 +302,24 @@ int dev_uart_init(void) {
 
     ESP_LOGI(LOG_UART, "UART initialized on port %d, baud rate %d", UART_PORT_NUM, UART_BAUD_RATE);
     ESP_LOGI(LOG_UART, "RX pin: GPIO%d, TX pin: GPIO%d", UART_RX_PIN, UART_TX_PIN);
+
+    // Initialize protocol system
+    uart_protocol_init_all();
+
+    // Set default protocol based on configuration
+    uart_protocol_t configured_protocol = uart_protocol_get_configured();
+    if (configured_protocol == UART_PROTOCOL_AUTO_DETECT) {
+        // Start with simple protocol, auto-detection will happen in RX task
+        configured_protocol = UART_PROTOCOL_SIMPLE;
+    }
+
+    int protocol_result = dev_uart_set_protocol(configured_protocol);
+    if (protocol_result != 0) {
+        ESP_LOGW(LOG_UART, "Failed to set protocol %d, using SIMPLE", configured_protocol);
+        dev_uart_set_protocol(UART_PROTOCOL_SIMPLE);
+    }
+
+    ESP_LOGI(LOG_UART, "Protocol set to: %s", uart_protocol_get_name(configured_protocol));
 
     g_uart_manager.initialized = true;
     return 0;
@@ -350,6 +436,12 @@ void dev_uart_process_events(void) {
                         }
                         break;
 
+                    case UART_EVENT_HID:
+                        process_hid_event(&event.data.hid);
+                        ESP_LOGD(LOG_UART, "Processed HID event: buttons=0x%04X, hat=0x%02X",
+                                 event.data.hid.button_mask, event.data.hid.hat_state);
+                        break;
+
                     case UART_EVENT_UNKNOWN:
                     default:
                         ESP_LOGD(LOG_UART, "Unknown event type: %d", event.type);
@@ -413,4 +505,75 @@ void uart_update_hid_report_from_stick(uint8_t stick_id, uint16_t x, uint16_t y)
         }
         xSemaphoreGive(g_uart_manager.report_mutex);
     }
+}
+
+// Protocol management functions
+
+int dev_uart_set_protocol(uart_protocol_t protocol) {
+    if (!g_uart_manager.initialized) {
+        ESP_LOGE(LOG_UART, "UART not initialized");
+        return -1;
+    }
+
+    // Check if protocol is changing
+    if (g_uart_manager.current_protocol == protocol &&
+        g_uart_manager.protocol_impl != NULL) {
+        ESP_LOGD(LOG_UART, "Protocol already set to %d", protocol);
+        return 0;
+    }
+
+    // Get protocol implementation
+    const uart_protocol_impl_t* new_impl = uart_protocol_get_impl(protocol);
+    if (new_impl == NULL) {
+        ESP_LOGE(LOG_UART, "Protocol implementation not found: %d", protocol);
+        return -1;
+    }
+
+    // Deinitialize old protocol if needed
+    if (g_uart_manager.protocol_impl != NULL &&
+        g_uart_manager.protocol_impl->deinit_protocol != NULL) {
+        g_uart_manager.protocol_impl->deinit_protocol();
+    }
+
+    // Initialize new protocol
+    if (new_impl->init_protocol != NULL) {
+        new_impl->init_protocol();
+    }
+
+    // Update manager
+    g_uart_manager.current_protocol = protocol;
+    g_uart_manager.protocol_impl = new_impl;
+
+    // Update statistics
+    uart_protocol_update_stats_protocol_switch();
+
+    ESP_LOGI(LOG_UART, "Protocol switched to: %s (v%s)",
+             new_impl->name,
+             new_impl->get_version != NULL ? new_impl->get_version() : "unknown");
+
+    return 0;
+}
+
+uart_protocol_t dev_uart_get_protocol(void) {
+    return g_uart_manager.current_protocol;
+}
+
+void dev_uart_get_protocol_stats(uart_protocol_stats_t* stats) {
+    if (stats != NULL) {
+        // Combine global stats with manager stats
+        uart_protocol_get_stats(stats);
+        // Also include manager stats if needed
+        stats->protocol_switches = g_uart_manager.protocol_stats.protocol_switches;
+    }
+}
+
+void dev_uart_reset_protocol_stats(void) {
+    uart_protocol_reset_stats();
+    memset(&g_uart_manager.protocol_stats, 0, sizeof(uart_protocol_stats_t));
+    ESP_LOGI(LOG_UART, "Protocol statistics reset");
+}
+
+void dev_uart_set_debug_logging(bool enable) {
+    uart_protocol_set_debug(enable);
+    ESP_LOGI(LOG_UART, "Debug logging %s", enable ? "enabled" : "disabled");
 }

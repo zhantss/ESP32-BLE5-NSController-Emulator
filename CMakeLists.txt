@@ -7,4 +7,9 @@ idf_build_set_property(MINIMAL_BUILD ON)
 
 add_compile_definitions(CONFIG_MCU_DEBUG)
 
+# UART Protocol Configuration
+# 0 = Simple protocol (default)
+# 1 = EasyCon protocol (now implemented)
+add_compile_definitions(CONFIG_UART_PROTOCOL=0)
+
 project(ESP32-BLE5-NSController-Emulator)

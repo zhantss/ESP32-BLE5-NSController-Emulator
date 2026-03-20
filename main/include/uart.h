@@ -3,64 +3,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
+
+#include "uart_common.h"
+#include "uart_protocol.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// UART Configuration
-#define UART_PORT_NUM           UART_NUM_1
-#define UART_BAUD_RATE          115200
-#define UART_RX_BUFFER_SIZE     1024
-#define UART_TX_BUFFER_SIZE     1024
-#define UART_RX_PIN             4   // GPIO4 for RX
-#define UART_TX_PIN             5   // GPIO5 for TX
-
-// Button event for queue communication
-typedef struct {
-    uint8_t button_id;      // Button ID (mapping to pro2_btns)
-    bool pressed;           // Pressed (true) or released (false)
-} button_event_t;
-
-// Stick event for queue communication
-typedef struct {
-    uint8_t stick_id;       // 0 = left stick, 1 = right stick
-    uint16_t x;             // X coordinate (12-bit, 0-0xFFF)
-    uint16_t y;             // Y coordinate (12-bit, 0-0xFFF)
-} stick_event_t;
-
-// Union for event data
-typedef union {
-    button_event_t button;
-    stick_event_t stick;
-} dev_uart_event_data_t;
-
-// UART event types
-typedef enum {
-    UART_EVENT_BUTTON,
-    UART_EVENT_STICK,
-    UART_EVENT_UNKNOWN
-} dev_uart_event_type_t;
-
-// Complete UART event with type
-typedef struct {
-    dev_uart_event_type_t type; // Event type
-    dev_uart_event_data_t data; // Event data
-} dev_uart_event_t;
-
-// UART manager structure
-typedef struct {
-    QueueHandle_t event_queue;      // Queue for UART events
-    SemaphoreHandle_t report_mutex; // Mutex for HID report access
-    TaskHandle_t uart_task_handle;  // UART task handle
-    bool initialized;               // UART initialized flag
-} dev_uart_manager_t;
-
-// Global UART manager
-extern dev_uart_manager_t g_uart_manager;
 
 /**
  * @brief Initialize UART driver and create UART task
@@ -113,6 +62,36 @@ dev_uart_event_type_t dev_uart_parse_frame(const uint8_t* data, size_t len, dev_
  * @return Number of bytes sent, negative on error
  */
 int dev_uart_send_data(const uint8_t* data, size_t len);
+
+/**
+ * @brief Set UART protocol
+ * @param protocol Protocol to use
+ * @return 0 on success, negative error code on failure
+ */
+int dev_uart_set_protocol(uart_protocol_t protocol);
+
+/**
+ * @brief Get current UART protocol
+ * @return Current protocol type
+ */
+uart_protocol_t dev_uart_get_protocol(void);
+
+/**
+ * @brief Get protocol statistics
+ * @param stats Output statistics structure
+ */
+void dev_uart_get_protocol_stats(uart_protocol_stats_t* stats);
+
+/**
+ * @brief Reset protocol statistics
+ */
+void dev_uart_reset_protocol_stats(void);
+
+/**
+ * @brief Enable/disable protocol debug logging
+ * @param enable true to enable, false to disable
+ */
+void dev_uart_set_debug_logging(bool enable);
 
 #ifdef __cplusplus
 }
