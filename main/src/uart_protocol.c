@@ -50,8 +50,7 @@ uart_protocol_t uart_protocol_get_configured(void) {
 
         // Validate protocol value
         if (protocol == UART_PROTOCOL_SIMPLE ||
-            protocol == UART_PROTOCOL_EASYCON ||
-            protocol == UART_PROTOCOL_AUTO_DETECT) {
+            protocol == UART_PROTOCOL_EASYCON) {
             return protocol;
         }
 
@@ -62,35 +61,6 @@ uart_protocol_t uart_protocol_get_configured(void) {
     return UART_PROTOCOL_SIMPLE;
 }
 
-// Auto-detect protocol from data
-uart_protocol_t uart_protocol_auto_detect(const uint8_t* data, size_t len) {
-    if (len < 2) {
-        return UART_PROTOCOL_SIMPLE; // Default if not enough data
-    }
-
-    protocol_stats.protocol_detections++;
-
-    // Try each protocol's detection function
-    for (int i = 0; protocol_registry[i] != NULL; i++) {
-        const uart_protocol_impl_t* impl = protocol_registry[i];
-
-        // Skip auto-detect protocol itself
-        if (impl->protocol == UART_PROTOCOL_AUTO_DETECT) {
-            continue;
-        }
-
-        if (impl->detect_protocol != NULL) {
-            if (impl->detect_protocol(data, len)) {
-                ESP_LOGD(LOG_PROTOCOL, "Auto-detected protocol: %s", impl->name);
-                return impl->protocol;
-            }
-        }
-    }
-
-    // Default to simple protocol if none detected
-    ESP_LOGD(LOG_PROTOCOL, "No protocol detected, using SIMPLE");
-    return UART_PROTOCOL_SIMPLE;
-}
 
 // Get protocol statistics
 void uart_protocol_get_stats(uart_protocol_stats_t* stats) {

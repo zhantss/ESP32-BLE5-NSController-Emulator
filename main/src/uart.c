@@ -89,7 +89,7 @@ static void process_hat_direction_internal(uint8_t hat_value) {
 }
 
 // Process complete HID event
-static void process_hid_event(const hid_event_t* hid_event) {
+static void process_hid_event(const ec_hid_event_t* hid_event) {
     // Process 16 non-direction, non-C buttons
     for (int i = 0; i < 16; i++) {
         if (i < BUTTON_MAP_SIZE) {
@@ -105,6 +105,65 @@ static void process_hid_event(const hid_event_t* hid_event) {
     // Process stick data
     pro2_set_left_stick(pro2_hid_report, hid_event->left_stick_x, hid_event->left_stick_y);
     pro2_set_right_stick(pro2_hid_report, hid_event->right_stick_x, hid_event->right_stick_y);
+}
+
+// Process full HID event (new protocol)
+static void process_full_hid_event(const simple_hid_event_t* simple_hid) {
+    // Process all 21 buttons from 3 button bytes
+    // Button bytes correspond to pro2_btn_bits_t structure
+    uint8_t* btn_bytes = (uint8_t*)simple_hid->button_bytes;
+
+    // Byte 0: B, A, Y, X, R, ZR, Plus, RClick
+    if (btn_bytes[0] & 0x01) pro2_press_button(pro2_hid_report, B);
+    else pro2_release_button(pro2_hid_report, B);
+    if (btn_bytes[0] & 0x02) pro2_press_button(pro2_hid_report, A);
+    else pro2_release_button(pro2_hid_report, A);
+    if (btn_bytes[0] & 0x04) pro2_press_button(pro2_hid_report, Y);
+    else pro2_release_button(pro2_hid_report, Y);
+    if (btn_bytes[0] & 0x08) pro2_press_button(pro2_hid_report, X);
+    else pro2_release_button(pro2_hid_report, X);
+    if (btn_bytes[0] & 0x10) pro2_press_button(pro2_hid_report, R);
+    else pro2_release_button(pro2_hid_report, R);
+    if (btn_bytes[0] & 0x20) pro2_press_button(pro2_hid_report, ZR);
+    else pro2_release_button(pro2_hid_report, ZR);
+    if (btn_bytes[0] & 0x40) pro2_press_button(pro2_hid_report, Plus);
+    else pro2_release_button(pro2_hid_report, Plus);
+    if (btn_bytes[0] & 0x80) pro2_press_button(pro2_hid_report, RClick);
+    else pro2_release_button(pro2_hid_report, RClick);
+
+    // Byte 1: Down, Right, Left, Up, L, ZL, Minus, LClick
+    if (btn_bytes[1] & 0x01) pro2_press_button(pro2_hid_report, Down);
+    else pro2_release_button(pro2_hid_report, Down);
+    if (btn_bytes[1] & 0x02) pro2_press_button(pro2_hid_report, Right);
+    else pro2_release_button(pro2_hid_report, Right);
+    if (btn_bytes[1] & 0x04) pro2_press_button(pro2_hid_report, Left);
+    else pro2_release_button(pro2_hid_report, Left);
+    if (btn_bytes[1] & 0x08) pro2_press_button(pro2_hid_report, Up);
+    else pro2_release_button(pro2_hid_report, Up);
+    if (btn_bytes[1] & 0x10) pro2_press_button(pro2_hid_report, L);
+    else pro2_release_button(pro2_hid_report, L);
+    if (btn_bytes[1] & 0x20) pro2_press_button(pro2_hid_report, ZL);
+    else pro2_release_button(pro2_hid_report, ZL);
+    if (btn_bytes[1] & 0x40) pro2_press_button(pro2_hid_report, Minus);
+    else pro2_release_button(pro2_hid_report, Minus);
+    if (btn_bytes[1] & 0x80) pro2_press_button(pro2_hid_report, LClick);
+    else pro2_release_button(pro2_hid_report, LClick);
+
+    // Byte 2: Home, Capture, GR, GL, C, reserved(3 bits)
+    if (btn_bytes[2] & 0x01) pro2_press_button(pro2_hid_report, Home);
+    else pro2_release_button(pro2_hid_report, Home);
+    if (btn_bytes[2] & 0x02) pro2_press_button(pro2_hid_report, Capture);
+    else pro2_release_button(pro2_hid_report, Capture);
+    if (btn_bytes[2] & 0x04) pro2_press_button(pro2_hid_report, GR);
+    else pro2_release_button(pro2_hid_report, GR);
+    if (btn_bytes[2] & 0x08) pro2_press_button(pro2_hid_report, GL);
+    else pro2_release_button(pro2_hid_report, GL);
+    if (btn_bytes[2] & 0x10) pro2_press_button(pro2_hid_report, C);
+    else pro2_release_button(pro2_hid_report, C);
+
+    // Process stick data
+    pro2_set_left_stick(pro2_hid_report, simple_hid->left_stick_x, simple_hid->left_stick_y);
+    pro2_set_right_stick(pro2_hid_report, simple_hid->right_stick_x, simple_hid->right_stick_y);
 }
 
 static uint8_t calculate_checksum(const uint8_t* data, size_t len) {
@@ -131,6 +190,7 @@ static void uart_rx_task(void *arg) {
     size_t frame_pos = 0;
     bool in_frame = false;
     const uart_protocol_impl_t* current_impl = NULL;
+    const size_t MAX_HEADER_DETECT_LEN = 8; // Maximum bytes needed for protocol detection
 
     ESP_LOGI(LOG_UART, "UART RX task started");
 
@@ -152,90 +212,83 @@ static void uart_rx_task(void *arg) {
                 uint8_t byte = data[i];
 
                 if (!in_frame) {
-                    // Check if this byte could start a frame
-                    // We need to check with protocol detection
-                    uint8_t test_data[2] = {byte, 0};
-                    if (current_impl->detect_protocol != NULL &&
-                        current_impl->detect_protocol(test_data, 1)) {
-                        // Potential frame start
-                        frame_pos = 0;
-                        frame_buffer[frame_pos++] = byte;
-                        in_frame = true;
-                        ESP_LOGD(LOG_UART, "Potential frame start detected (0x%02X)", byte);
-                    }
-                } else if (in_frame) {
-                    // Continue frame
+                    // Add byte to frame buffer for detection
                     if (frame_pos < UART_MAX_FRAME_SIZE) {
                         frame_buffer[frame_pos++] = byte;
+                    }
 
-                        // Check if we have enough data to attempt parsing
-                        if (current_impl->get_expected_frame_size != NULL) {
-                            size_t expected_size = current_impl->get_expected_frame_size(frame_buffer, frame_pos);
+                    // If buffer exceeds detection window, discard oldest byte
+                    if (frame_pos > MAX_HEADER_DETECT_LEN) {
+                        // Shift left by one byte
+                        memmove(frame_buffer, frame_buffer + 1, frame_pos - 1);
+                        frame_pos--;
+                    }
 
-                            if (expected_size > 0 && frame_pos >= expected_size) {
-                                // We have a complete frame (or enough to parse)
-                                dev_uart_event_t event;
-                                dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
+                    // Try to detect protocol with current buffer
+                    if (current_impl->detect_protocol != NULL) {
+                        size_t header_offset = current_impl->detect_protocol(frame_buffer, frame_pos);
+                        if (header_offset > 0) {
+                            // Convert back to 0-based offset
+                            header_offset--;
 
-                                if (type != UART_EVENT_UNKNOWN) {
-                                    // Valid frame, send to queue
-                                    if (g_uart_manager.event_queue != NULL) {
-                                        if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
-                                            ESP_LOGW(LOG_UART, "Event queue full, dropping event");
-                                        }
-                                    }
-                                    in_frame = false;
-                                    frame_pos = 0;
-                                } else {
-                                    // Frame parsing failed
-                                    ESP_LOGD(LOG_UART, "Frame parsing failed, resetting");
-                                    in_frame = false;
-                                    frame_pos = 0;
-                                }
-                            } else if (expected_size == 0 && frame_pos >= 4) {
-                                // Protocol doesn't know expected size, try parsing anyway
-                                // (for protocols without get_expected_frame_size implementation)
-                                dev_uart_event_t event;
-                                dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
-
-                                if (type != UART_EVENT_UNKNOWN) {
-                                    // Valid frame
-                                    if (g_uart_manager.event_queue != NULL) {
-                                        if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
-                                            ESP_LOGW(LOG_UART, "Event queue full, dropping event");
-                                        }
-                                    }
-                                    in_frame = false;
-                                    frame_pos = 0;
-                                }
+                            // If header not at start, shift buffer to align
+                            if (header_offset > 0) {
+                                memmove(frame_buffer, frame_buffer + header_offset, frame_pos - header_offset);
+                                frame_pos -= header_offset;
+                                ESP_LOGD(LOG_UART, "Aligned frame header, offset %d, new buffer size %d", header_offset, frame_pos);
                             }
-                        } else {
-                            // Protocol doesn't have get_expected_frame_size function
-                            // Try parsing when we have at least minimum frame size
-                            if (frame_pos >= 4) {
-                                dev_uart_event_t event;
-                                dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
 
-                                if (type != UART_EVENT_UNKNOWN) {
-                                    // Valid frame
-                                    if (g_uart_manager.event_queue != NULL) {
-                                        if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
-                                            ESP_LOGW(LOG_UART, "Event queue full, dropping event");
-                                        }
-                                    }
-                                    in_frame = false;
-                                    frame_pos = 0;
-                                } else if (frame_pos >= UART_MAX_FRAME_SIZE) {
-                                    // Frame too long
-                                    ESP_LOGW(LOG_UART, "Frame too long, resetting");
-                                    in_frame = false;
-                                    frame_pos = 0;
-                                }
-                            }
+                            // Start frame collection
+                            in_frame = true;
+                            ESP_LOGD(LOG_UART, "Frame start detected, buffer size %d", frame_pos);
                         }
+                    }
+                } else {
+                    // Continue frame collection
+                    if (frame_pos < UART_MAX_FRAME_SIZE) {
+                        frame_buffer[frame_pos++] = byte;
                     } else {
                         // Frame too long
                         ESP_LOGW(LOG_UART, "Frame too long, resetting");
+                        in_frame = false;
+                        frame_pos = 0;
+                        continue;
+                    }
+
+                    // Check if we have a complete frame
+                    bool frame_complete = false;
+                    size_t expected_size = 0;
+
+                    if (current_impl->get_expected_frame_size != NULL) {
+                        expected_size = current_impl->get_expected_frame_size(frame_buffer, frame_pos);
+                        if (expected_size > 0 && frame_pos >= expected_size) {
+                            frame_complete = true;
+                        }
+                    }
+
+                    // If protocol doesn't know expected size, try parsing after minimum bytes
+                    if (!frame_complete && frame_pos >= 4) {
+                        // Try parsing anyway for protocols without get_expected_frame_size
+                        frame_complete = true;
+                    }
+
+                    if (frame_complete) {
+                        dev_uart_event_t event;
+                        dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
+
+                        if (type != UART_EVENT_UNKNOWN) {
+                            // Valid frame, send to queue
+                            if (g_uart_manager.event_queue != NULL) {
+                                if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
+                                    ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+                                }
+                            }
+                            ESP_LOGD(LOG_UART, "Frame parsed successfully, type=%d", type);
+                        } else {
+                            ESP_LOGD(LOG_UART, "Frame parsing failed");
+                        }
+
+                        // Reset for next frame
                         in_frame = false;
                         frame_pos = 0;
                     }
@@ -308,10 +361,6 @@ int dev_uart_init(void) {
 
     // Set default protocol based on configuration
     uart_protocol_t configured_protocol = uart_protocol_get_configured();
-    if (configured_protocol == UART_PROTOCOL_AUTO_DETECT) {
-        // Start with simple protocol, auto-detection will happen in RX task
-        configured_protocol = UART_PROTOCOL_SIMPLE;
-    }
 
     int protocol_result = dev_uart_set_protocol(configured_protocol);
     if (protocol_result != 0) {
@@ -406,40 +455,37 @@ void dev_uart_process_events(void) {
             if (pro2_hid_report != NULL) {
                 // Process event based on type
                 switch (event.type) {
-                    case UART_EVENT_BUTTON:
-                        if (event.data.button.button_id < BUTTON_MAP_SIZE) {
-                            pro2_set_button(pro2_hid_report,
-                                          button_map[event.data.button.button_id],
-                                          event.data.button.pressed);
-                            ESP_LOGD(LOG_UART, "Processed button event: id=%d, pressed=%d",
-                                     event.data.button.button_id, event.data.button.pressed);
-                        } else {
-                            ESP_LOGW(LOG_UART, "Invalid button ID: %d", event.data.button.button_id);
-                        }
-                        break;
-
-                    case UART_EVENT_STICK:
-                        if (event.data.stick.stick_id == 0) {
-                            pro2_set_left_stick(pro2_hid_report,
-                                              event.data.stick.x,
-                                              event.data.stick.y);
-                            ESP_LOGD(LOG_UART, "Processed left stick: x=0x%03X, y=0x%03X",
-                                     event.data.stick.x, event.data.stick.y);
-                        } else if (event.data.stick.stick_id == 1) {
-                            pro2_set_right_stick(pro2_hid_report,
-                                               event.data.stick.x,
-                                               event.data.stick.y);
-                            ESP_LOGD(LOG_UART, "Processed right stick: x=0x%03X, y=0x%03X",
-                                     event.data.stick.x, event.data.stick.y);
-                        } else {
-                            ESP_LOGW(LOG_UART, "Invalid stick ID: %d", event.data.stick.stick_id);
-                        }
-                        break;
-
-                    case UART_EVENT_HID:
-                        process_hid_event(&event.data.hid);
+                    case UART_EVENT_EC_HID:
+                        process_hid_event(&event.data.ec_hid);
                         ESP_LOGD(LOG_UART, "Processed HID event: buttons=0x%04X, hat=0x%02X",
-                                 event.data.hid.button_mask, event.data.hid.hat_state);
+                                 event.data.ec_hid.button_mask, event.data.ec_hid.hat_state);
+                        break;
+
+                    case UART_EVENT_SIMPLE_HID:
+                        process_full_hid_event(&event.data.simple_hid);
+                        ESP_LOGD(LOG_UART, "Processed full HID event: buttons=0x%02X%02X%02X",
+                                 event.data.simple_hid.button_bytes[0],
+                                 event.data.simple_hid.button_bytes[1],
+                                 event.data.simple_hid.button_bytes[2]);
+                        break;
+
+                    case UART_EVENT_SIMPLE_MANAGEMENT:
+                        // Handle management commands
+                        ESP_LOGD(LOG_UART, "Management event: command=0x%02X",
+                                 event.data.management.command);
+                        // TODO: Implement management command handling
+                        // (handshake, heartbeat, reboot, etc.)
+                        break;
+
+                    case UART_EVENT_SIMPLE_SENSOR:
+                        // Handle sensor data
+                        ESP_LOGD(LOG_UART, "Sensor event: type=0x%02X, data=0x%02X%02X%02X%02X",
+                                 event.data.sensor.sensor_type,
+                                 event.data.sensor.sensor_data[0],
+                                 event.data.sensor.sensor_data[1],
+                                 event.data.sensor.sensor_data[2],
+                                 event.data.sensor.sensor_data[3]);
+                        // TODO: Process sensor data as needed
                         break;
 
                     case UART_EVENT_UNKNOWN:

@@ -99,49 +99,59 @@ dev_uart_event_type_t easycon_protocol_parse_frame(const uint8_t* data, size_t l
     uint16_t right_stick_y = easycon_scale_stick_value(ry_raw);
 
     // Fill HID event
-    event->type = UART_EVENT_HID;
-    event->data.hid.button_mask = button_mask;
-    event->data.hid.hat_state = hat_state;
-    event->data.hid.left_stick_x = left_stick_x;
-    event->data.hid.left_stick_y = left_stick_y;
-    event->data.hid.right_stick_x = right_stick_x;
-    event->data.hid.right_stick_y = right_stick_y;
+    event->type = UART_EVENT_EC_HID;
+    event->data.ec_hid.button_mask = button_mask;
+    event->data.ec_hid.hat_state = hat_state;
+    event->data.ec_hid.left_stick_x = left_stick_x;
+    event->data.ec_hid.left_stick_y = left_stick_y;
+    event->data.ec_hid.right_stick_x = right_stick_x;
+    event->data.ec_hid.right_stick_y = right_stick_y;
 
     ESP_LOGD(LOG_EASYCON, "HID event: buttons=0x%04X, hat=0x%02X, LX=0x%03X, LY=0x%03X, RX=0x%03X, RY=0x%03X",
              button_mask, hat_state, left_stick_x, left_stick_y, right_stick_x, right_stick_y);
 
-    return UART_EVENT_HID;
+    return UART_EVENT_EC_HID;
 }
 
-bool easycon_protocol_detect(const uint8_t* data, size_t len) {
+size_t easycon_protocol_detect(const uint8_t* data, size_t len) {
     // Need at least 8 bytes to detect
     if (len < EASYCON_PROTOCOL_ENCODED_SIZE) {
-        return false;
+        return 0;
     }
 
-    // Check if last byte has bit7=1 (end marker)
-    if ((data[7] & 0x80) == 0) {
-        return false;
-    }
-
-    // Check first 7 bytes have bit7=0 (7-bit data)
-    for (int i = 0; i < 7; i++) {
-        if ((data[i] & 0x80) != 0) {
-            return false;
+    // Search for EasyCon frame pattern in sliding window
+    for (size_t start = 0; start <= len - EASYCON_PROTOCOL_ENCODED_SIZE; start++) {
+        // Check if last byte has bit7=1 (end marker)
+        if ((data[start + 7] & 0x80) == 0) {
+            continue;
         }
+
+        // Check first 7 bytes have bit7=0 (7-bit data)
+        bool valid = true;
+        for (int i = 0; i < 7; i++) {
+            if ((data[start + i] & 0x80) != 0) {
+                valid = false;
+                break;
+            }
+        }
+        if (!valid) {
+            continue;
+        }
+
+        // Try to decode and validate HAT value
+        uint8_t raw_data[EASYCON_PROTOCOL_RAW_SIZE];
+        easycon_decode_7bit_packed(data + start, raw_data, EASYCON_PROTOCOL_RAW_SIZE);
+
+        uint8_t hat = raw_data[2];
+        if (hat > HAT_CENTER) {
+            continue;
+        }
+
+        ESP_LOGD(LOG_EASYCON, "Detected EasyCon protocol with valid frame at offset %d", start);
+        return start + 1;
     }
 
-    // Try to decode and validate HAT value
-    uint8_t raw_data[EASYCON_PROTOCOL_RAW_SIZE];
-    easycon_decode_7bit_packed(data, raw_data, EASYCON_PROTOCOL_RAW_SIZE);
-
-    uint8_t hat = raw_data[2];
-    if (hat > HAT_CENTER) {
-        return false;
-    }
-
-    ESP_LOGD(LOG_EASYCON, "Detected EasyCon protocol with valid frame");
-    return true;
+    return 0;
 }
 
 // Protocol initialization (no-op for EasyCon protocol)

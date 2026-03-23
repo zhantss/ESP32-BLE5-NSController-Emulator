@@ -72,7 +72,7 @@ dev_uart_event_type_t easycon_protocol_parse_frame(const uint8_t* data, size_t l
  * @param len Data length
  * @return true if data matches EasyCon protocol
  */
-bool easycon_protocol_detect(const uint8_t* data, size_t len);
+size_t easycon_protocol_detect(const uint8_t* data, size_t len);
 
 #ifdef __cplusplus
 }

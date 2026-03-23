@@ -28,20 +28,28 @@ extern const size_t BUTTON_MAP_SIZE;
 #define UART_TX_PIN             5   // GPIO5 for TX
 #define UART_MAX_FRAME_SIZE     32   // Maximum frame size for all protocols
 
-// Button event for queue communication
-typedef struct {
-    uint8_t button_id;      // Button ID (mapping to pro2_btns)
-    bool pressed;           // Pressed (true) or released (false)
-} button_event_t;
 
-// Stick event for queue communication
+// Full HID event (new protocol) - contains all button bytes and stick data
 typedef struct {
-    uint8_t stick_id;       // 0 = left stick, 1 = right stick
-    uint16_t x;             // X coordinate (12-bit, 0-0xFFF)
-    uint16_t y;             // Y coordinate (12-bit, 0-0xFFF)
-} stick_event_t;
+    uint8_t button_bytes[3];    // 3 bytes button state (corresponding to pro2_btn_bits_t)
+    uint16_t left_stick_x;      // Left stick X coordinate (12-bit, 0-0xFFF, unpacked)
+    uint16_t left_stick_y;      // Left stick Y coordinate (12-bit, 0-0xFFF, unpacked)
+    uint16_t right_stick_x;     // Right stick X coordinate (12-bit, 0-0xFFF, unpacked)
+    uint16_t right_stick_y;     // Right stick Y coordinate (12-bit, 0-0xFFF, unpacked)
+} simple_hid_event_t;
 
-// HID event for complete controller state
+// Management event (new protocol)
+typedef struct {
+    uint8_t command;            // Command code
+} simple_management_event_t;
+
+// Sensor event (new protocol)
+typedef struct {
+    uint8_t sensor_type;        // Sensor type
+    uint8_t sensor_data[4];     // Sensor data (at least 28bit, 4 bytes = 32bit)
+} simple_sensor_event_t;
+
+// EasyCon protocol event
 typedef struct {
     uint16_t button_mask;    // Button bitmask (16 bits for non-direction, non-C buttons)
     uint8_t hat_state;       // HAT direction state (0x00-0x08)
@@ -49,20 +57,26 @@ typedef struct {
     uint16_t left_stick_y;   // Left stick Y coordinate (12-bit, 0-0xFFF)
     uint16_t right_stick_x;  // Right stick X coordinate (12-bit, 0-0xFFF)
     uint16_t right_stick_y;  // Right stick Y coordinate (12-bit, 0-0xFFF)
-} hid_event_t;
+} ec_hid_event_t;
 
 // Union for event data
 typedef union {
-    button_event_t button;
-    stick_event_t stick;
-    hid_event_t hid;        // Complete HID state event
+    // Simple Protocol
+    simple_management_event_t management;       // Management operation
+    simple_sensor_event_t sensor;               // Sensor data
+    simple_hid_event_t simple_hid;              // Simple HID event
+    // EasyCon Protocol
+    ec_hid_event_t ec_hid;                         // EasyCon HID Event
 } dev_uart_event_data_t;
 
 // UART event types
 typedef enum {
-    UART_EVENT_BUTTON,
-    UART_EVENT_STICK,
-    UART_EVENT_HID,      // Complete HID state event
+    // Simple 
+    UART_EVENT_SIMPLE_MANAGEMENT, // Management operation
+    UART_EVENT_SIMPLE_SENSOR,     // Sensor data
+    UART_EVENT_SIMPLE_HID,        // Simple HID data (buttons + sticks)
+    // EasyCon
+    UART_EVENT_EC_HID,            // EasyCon HID data (buttons + sticks)
     UART_EVENT_UNKNOWN
 } dev_uart_event_type_t;
 
@@ -78,7 +92,6 @@ typedef struct {
 typedef enum {
     UART_PROTOCOL_SIMPLE = 0,     ///< Simple protocol with XOR checksum
     UART_PROTOCOL_EASYCON = 1,    ///< EasyCon protocol for advanced controllers
-    UART_PROTOCOL_AUTO_DETECT = 2 ///< Auto-detect protocol from data
 } uart_protocol_t;
 
 /**
@@ -103,9 +116,9 @@ typedef struct {
      * @brief Detect if this protocol is being used
      * @param data Raw UART data
      * @param len Length of data
-     * @return true if this protocol is detected, false otherwise
+     * @return 0 if protocol not detected, otherwise offset to frame header (0-based)
      */
-    bool (*detect_protocol)(const uint8_t* data, size_t len);
+    size_t (*detect_protocol)(const uint8_t* data, size_t len);
 
     /**
      * @brief Get expected frame size based on current data

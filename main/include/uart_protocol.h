@@ -31,13 +31,6 @@ const uart_protocol_impl_t* uart_protocol_get_impl(uart_protocol_t protocol);
  */
 uart_protocol_t uart_protocol_get_configured(void);
 
-/**
- * @brief Auto-detect protocol from data
- * @param data Raw UART data
- * @param len Length of data
- * @return Detected protocol type, or UART_PROTOCOL_SIMPLE if uncertain
- */
-uart_protocol_t uart_protocol_auto_detect(const uint8_t* data, size_t len);
 
 /**
  * @brief Get protocol statistics
