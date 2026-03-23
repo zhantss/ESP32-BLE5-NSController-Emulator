@@ -77,6 +77,7 @@ typedef enum {
     UART_EVENT_SIMPLE_HID,        // Simple HID data (buttons + sticks)
     // EasyCon
     UART_EVENT_EC_HID,            // EasyCon HID data (buttons + sticks)
+    // Unknown
     UART_EVENT_UNKNOWN
 } dev_uart_event_type_t;
 

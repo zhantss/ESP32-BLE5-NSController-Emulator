@@ -9,12 +9,12 @@ extern "C" {
 
 #define SIMPLE_PROTOCOL_MAX_FRAME_SIZE 32    // Increased for new protocol frames
 
-// New protocol frame types (replaces old protocol)
-#define SIMPLE_PROTOCOL_TYPE_FULL_HID       0x01   // 0x01: Full HID data (buttons + sticks)
+// protocol frame types
+#define SIMPLE_PROTOCOL_TYPE_HID            0x01   // 0x01: Full HID data (buttons + sticks)
 #define SIMPLE_PROTOCOL_TYPE_MANAGEMENT     0x02   // 0x02: Management operation
 #define SIMPLE_PROTOCOL_TYPE_SENSOR         0x03   // Sensor data (at least 28bit)
 
-// New protocol frame header/footer
+// protocol frame header/footer
 #define SIMPLE_PROTOCOL_NEW_START_BYTE1     0xAA
 #define SIMPLE_PROTOCOL_NEW_START_BYTE2     0x55
 #define SIMPLE_PROTOCOL_NEW_END_BYTE1       0x55
@@ -28,7 +28,7 @@ extern "C" {
 #define MGMT_CMD_ERROR_REPORT     0x05  // Error report
 
 // Frame sizes for new protocol
-#define SIMPLE_FRAME_SIZE_FULL_HID    16  // 2+1+9+2+2 = 16 bytes
+#define SIMPLE_FRAME_SIZE_HID         16  // 2+1+9+2+2 = 16 bytes
 #define SIMPLE_FRAME_SIZE_MANAGEMENT  8   // 2+1+1+2+2 = 8 bytes
 #define SIMPLE_FRAME_SIZE_SENSOR      12  // 2+1+5+2+2 = 12 bytes
 

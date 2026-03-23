@@ -88,8 +88,8 @@ static void process_hat_direction_internal(uint8_t hat_value) {
     pro2_set_button(pro2_hid_report, Right, right_pressed);
 }
 
-// Process complete HID event
-static void process_hid_event(const ec_hid_event_t* hid_event) {
+// Process complete EasyCon HID event
+static void process_ec_hid_event(const ec_hid_event_t* hid_event) {
     // Process 16 non-direction, non-C buttons
     for (int i = 0; i < 16; i++) {
         if (i < BUTTON_MAP_SIZE) {
@@ -107,8 +107,8 @@ static void process_hid_event(const ec_hid_event_t* hid_event) {
     pro2_set_right_stick(pro2_hid_report, hid_event->right_stick_x, hid_event->right_stick_y);
 }
 
-// Process full HID event (new protocol)
-static void process_full_hid_event(const simple_hid_event_t* simple_hid) {
+// Process Simple HID event (new protocol)
+static void process_simple_hid_event(const simple_hid_event_t* simple_hid) {
     // Process all 21 buttons from 3 button bytes
     // Button bytes correspond to pro2_btn_bits_t structure
     uint8_t* btn_bytes = (uint8_t*)simple_hid->button_bytes;
@@ -456,13 +456,13 @@ void dev_uart_process_events(void) {
                 // Process event based on type
                 switch (event.type) {
                     case UART_EVENT_EC_HID:
-                        process_hid_event(&event.data.ec_hid);
+                        process_ec_hid_event(&event.data.ec_hid);
                         ESP_LOGD(LOG_UART, "Processed HID event: buttons=0x%04X, hat=0x%02X",
                                  event.data.ec_hid.button_mask, event.data.ec_hid.hat_state);
                         break;
 
                     case UART_EVENT_SIMPLE_HID:
-                        process_full_hid_event(&event.data.simple_hid);
+                        process_simple_hid_event(&event.data.simple_hid);
                         ESP_LOGD(LOG_UART, "Processed full HID event: buttons=0x%02X%02X%02X",
                                  event.data.simple_hid.button_bytes[0],
                                  event.data.simple_hid.button_bytes[1],

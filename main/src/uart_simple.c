@@ -55,8 +55,8 @@ size_t simple_protocol_get_expected_frame_size(const uint8_t* data, size_t len) 
             // New protocol detected
             uint8_t frame_type = data[2];
             switch (frame_type) {
-                case SIMPLE_PROTOCOL_TYPE_FULL_HID:
-                    return SIMPLE_FRAME_SIZE_FULL_HID;    // 16 bytes
+                case SIMPLE_PROTOCOL_TYPE_HID:
+                    return SIMPLE_FRAME_SIZE_HID;    // 16 bytes
                 case SIMPLE_PROTOCOL_TYPE_MANAGEMENT:
                     return SIMPLE_FRAME_SIZE_MANAGEMENT;  // 8 bytes
                 case SIMPLE_PROTOCOL_TYPE_SENSOR:
@@ -109,9 +109,9 @@ dev_uart_event_type_t simple_protocol_parse_frame(const uint8_t* data, size_t le
 
         // Parse based on frame type
         switch (frame_type) {
-            case SIMPLE_PROTOCOL_TYPE_FULL_HID: {
+            case SIMPLE_PROTOCOL_TYPE_HID: {
                 // Full HID data frame (16 bytes total)
-                if (expected_size != SIMPLE_FRAME_SIZE_FULL_HID) {
+                if (expected_size != SIMPLE_FRAME_SIZE_HID) {
                     ESP_LOGE(LOG_SIMPLE, "Invalid full HID frame size: %zu", expected_size);
                     return UART_EVENT_UNKNOWN;
                 }
@@ -214,7 +214,7 @@ size_t simple_protocol_detect(const uint8_t* data, size_t len) {
             // Found header, check if we have at least frame type byte
             if (i + 2 < len) {
                 uint8_t frame_type = data[i + 2];
-                if (frame_type == SIMPLE_PROTOCOL_TYPE_FULL_HID ||
+                if (frame_type == SIMPLE_PROTOCOL_TYPE_HID ||
                     frame_type == SIMPLE_PROTOCOL_TYPE_MANAGEMENT ||
                     frame_type == SIMPLE_PROTOCOL_TYPE_SENSOR) {
 
