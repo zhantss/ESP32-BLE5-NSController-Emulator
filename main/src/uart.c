@@ -79,7 +79,7 @@ static void uart_rx_task(void *arg) {
                     dev_uart_event_type_t type = uart_protocol_parse_frame(current_impl, frame_buffer, frame_size, &event);
                     if (type != UART_EVENT_UNKNOWN) {
                         if (g_uart_manager.event_queue != NULL) {
-                            if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
+                            if (xQueueSend(g_uart_manager.event_queue, &event, 1) != pdTRUE) {
                                 ESP_LOGW(LOG_UART, "Event queue full, dropping event");
                             }
                         }
@@ -240,6 +240,8 @@ void dev_uart_process_events(void) {
 
     // If events were processed, request buffer swap
     if (events_processed) {
+        // Ensure all writes to the back_buffer are visible to the HID task prior to setting the swap_request.
+        MEMORY_BARRIER();
         g_hid_double_buffer.swap_request = 1;
     }
 }

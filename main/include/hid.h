@@ -9,6 +9,9 @@
 
 #include "device.h"
 
+// memory barrier
+#define MEMORY_BARRIER() __sync_synchronize()
+
 // HID Report Interval(ms)
 #define HID_REPORT_INTERVAL     15
 typedef struct {
@@ -44,13 +47,6 @@ extern uint16_t hid_report_gatt_handle;
 
 void hid_start_task(void);
 void hid_stop_task(void);
-
-// hid functions
-
-void hid_report_init(hid_device_report_t *report);
-void hid_set_button(hid_device_report_t *report, uint16_t btn_id, bool pressed);
-void hid_set_left_stick(hid_device_report_t *report, uint16_t x, uint16_t y);
-void hid_set_right_stick(hid_device_report_t *report, uint16_t x, uint16_t y);
 
 const hid_device_ops_t* hid_get_device_ops(dev_type_t type);
 

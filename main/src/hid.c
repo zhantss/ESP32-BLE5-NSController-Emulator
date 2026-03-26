@@ -32,38 +32,6 @@ const hid_device_ops_t* hid_get_device_ops(dev_type_t type) {
     }
 }
 
-void hid_report_init(hid_device_report_t *report) {
-    if (report == NULL) return;
-    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
-    if (ops && ops->report_init) {
-        ops->report_init(report);
-    }
-}
-
-void hid_set_button(hid_device_report_t *report, uint16_t btn_id, bool pressed) {
-    if (report == NULL) return;
-    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
-    if (ops && ops->set_button) {
-        ops->set_button(report, btn_id, pressed);
-    }
-}
-
-void hid_set_left_stick(hid_device_report_t *report, uint16_t x, uint16_t y) {
-    if (report == NULL) return;
-    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
-    if (ops && ops->set_left_stick) {
-        ops->set_left_stick(report, x, y);
-    }
-}
-
-void hid_set_right_stick(hid_device_report_t *report, uint16_t x, uint16_t y) {
-    if (report == NULL) return;
-    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
-    if (ops && ops->set_right_stick) {
-        ops->set_right_stick(report, x, y);
-    }
-}
-
 // hid report send task
 static void hid_task(void *arg) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -82,17 +50,23 @@ static void hid_task(void *arg) {
 
         if (g_hid_double_buffer.front_buffer != NULL) {
             const hid_device_ops_t *ops = hid_get_device_ops(g_hid_double_buffer.front_buffer->type);
-            if (ops != NULL || ops->next_report == NULL || ops->report_size == NULL) {
+            if (ops == NULL || ops->next_report == NULL || ops->report_size == NULL) {
                 ESP_LOGE(LOG_HID, "No valid device operations for type %d", g_hid_double_buffer.front_buffer->type);
                 continue;
             }
             
             // Check and perform buffer swap if requested
             if (g_hid_double_buffer.swap_request) {
+                // Ensure the latest values of swap_request and the contents of back_buffer are read.
+                MEMORY_BARRIER();
+
                 // Atomically swap front and back buffer pointers
                 hid_device_report_t* temp = g_hid_double_buffer.front_buffer;
                 g_hid_double_buffer.front_buffer = g_hid_double_buffer.back_buffer;
                 g_hid_double_buffer.back_buffer = temp;
+
+                // Ensure the pointer swap operation completes before clearing the swap_request.
+                MEMORY_BARRIER();
 
                 // Clear swap request
                 g_hid_double_buffer.swap_request = 0;
@@ -101,15 +75,10 @@ static void hid_task(void *arg) {
             // Update report counter, wrap around 0-255
             uint8_t* next_report = ops->next_report(g_hid_double_buffer.front_buffer);
             size_t report_size = ops->report_size();
-            if (next_report != NULL) {
-                // Send HID report (using front buffer)
-                int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
+            int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
                                     next_report, report_size);
-                if (rc != 0) {
-                    ESP_LOGW(LOG_HID, "hid report send failed, rc: %d", rc);
-                }
-            } else {
-                ESP_LOGW(LOG_HID, "hid report is NULL");
+            if (rc != 0) {
+                ESP_LOGW(LOG_HID, "hid report send failed, rc: %d", rc);
             }
         }
 
@@ -145,7 +114,7 @@ void hid_start_task(void) {
         goto error;
     }
 
-    BaseType_t rc = xTaskCreate(hid_task, "hid_task", 4096, NULL, 5, &hid_task_handle);
+    BaseType_t rc = xTaskCreate(hid_task, "hid_task", 4096, NULL, 7, &hid_task_handle);
     if (rc != pdPASS) {
         ESP_LOGE(LOG_HID, "create hid report task failed, rc: %d", rc);
         goto error;
