@@ -1,4 +1,5 @@
 #include "hid.h"
+#include "hid_pro2.h"
 #include "device.h"
 #include "utils.h"
 #include "uart.h"
@@ -6,7 +7,7 @@
 #include <string.h>
 
 // global hid report instance
-pro2_hid_report_t *pro2_hid_report = NULL;
+// pro2_hid_report_t *pro2_hid_report = NULL;
 TaskHandle_t hid_task_handle = NULL;
 uint16_t hid_report_gatt_handle = 0x000e;
 
@@ -17,87 +18,50 @@ hid_double_buffer_t g_hid_double_buffer = {
     .swap_request = 0
 };
 
-// 12 bits stick data packed into 3 bytes
-static void pack_stick_data(uint8_t out[3], uint16_t x, uint16_t y) {
-    // limit to 12 bits
-    x &= 0xFFF;
-    y &= 0xFFF;
-    // packed format: byte0=x[7:0], byte1=(y[3:0]<<4)|x[11:8], byte2=y[11:4]
-    out[0] = x & 0xFF;
-    out[1] = ((y & 0x0F) << 4) | ((x >> 8) & 0x0F);
-    out[2] = (y >> 4) & 0xFF;
-}
-
-static void unpack_stick_data(const uint8_t in[3], uint16_t *x, uint16_t *y) {
-    // packed format: byte0=x[7:0], byte1=(y[3:0]<<4)|x[11:8], byte2=y[11:4]
-    *x = in[0] | ((in[1] & 0x0F) << 8);
-    *y = ((in[1] >> 4) & 0x0F) | (in[2] << 4);
-    // ensure 12 bits limit (though input should already be valid)
-    *x &= 0xFFF;
-    *y &= 0xFFF;
-}
-
-void pro2_report_init(pro2_hid_report_t *report) {
-    if (report == NULL) return;
-
-    memset(report, 0, sizeof(pro2_hid_report_t));
-
-    // set fixed fields
-    report->counter = 0;
-    report->power_info = 0xFF;      // maybe 0x42
-    report->unknown_0x0b = 0x38;
-    report->unknown_0x0c = 0x00;
-    report->headset_flag = 0x00;
-    report->motion_data_len = 0x28;
-
-    // stick set to center (12-bit center value 0x800)
-    pro2_set_left_stick(report, 0x800, 0x800);
-    pro2_set_right_stick(report, 0x800, 0x800);
-}
-
-void pro2_set_left_stick(pro2_hid_report_t *report, uint16_t x, uint16_t y) {
-    pack_stick_data(report->left_stick, x, y);
-}
-
-void pro2_set_right_stick(pro2_hid_report_t *report, uint16_t x, uint16_t y) {
-    pack_stick_data(report->right_stick, x, y);
-}
-
-void pro2_set_button(pro2_hid_report_t *report, pro2_btns btn, bool pressed) {
-    uint8_t *btn_bytes = (uint8_t*)&report->buttons;
-
-    switch (btn) {
-        case A:      pressed ? (btn_bytes[0] |= 0x02) : (btn_bytes[0] &= ~0x02); break;
-        case B:      pressed ? (btn_bytes[0] |= 0x01) : (btn_bytes[0] &= ~0x01); break;
-        case X:      pressed ? (btn_bytes[0] |= 0x08) : (btn_bytes[0] &= ~0x08); break;
-        case Y:      pressed ? (btn_bytes[0] |= 0x04) : (btn_bytes[0] &= ~0x04); break;
-        case R:      pressed ? (btn_bytes[0] |= 0x10) : (btn_bytes[0] &= ~0x10); break;
-        case ZR:     pressed ? (btn_bytes[0] |= 0x20) : (btn_bytes[0] &= ~0x20); break;
-        case Plus:   pressed ? (btn_bytes[0] |= 0x40) : (btn_bytes[0] &= ~0x40); break;
-        case RClick: pressed ? (btn_bytes[0] |= 0x80) : (btn_bytes[0] &= ~0x80); break;
-        case Down:   pressed ? (btn_bytes[1] |= 0x01) : (btn_bytes[1] &= ~0x01); break;
-        case Right:  pressed ? (btn_bytes[1] |= 0x02) : (btn_bytes[1] &= ~0x02); break;
-        case Left:   pressed ? (btn_bytes[1] |= 0x04) : (btn_bytes[1] &= ~0x04); break;
-        case Up:     pressed ? (btn_bytes[1] |= 0x08) : (btn_bytes[1] &= ~0x08); break;
-        case L:      pressed ? (btn_bytes[1] |= 0x10) : (btn_bytes[1] &= ~0x10); break;
-        case ZL:     pressed ? (btn_bytes[1] |= 0x20) : (btn_bytes[1] &= ~0x20); break;
-        case Minus:  pressed ? (btn_bytes[1] |= 0x40) : (btn_bytes[1] &= ~0x40); break;
-        case LClick: pressed ? (btn_bytes[1] |= 0x80) : (btn_bytes[1] &= ~0x80); break;
-        case Home:   pressed ? (btn_bytes[2] |= 0x01) : (btn_bytes[2] &= ~0x01); break;
-        case Capture:pressed ? (btn_bytes[2] |= 0x02) : (btn_bytes[2] &= ~0x02); break;
-        case GR:     pressed ? (btn_bytes[2] |= 0x04) : (btn_bytes[2] &= ~0x04); break;
-        case GL:     pressed ? (btn_bytes[2] |= 0x08) : (btn_bytes[2] &= ~0x08); break;
-        case C:      pressed ? (btn_bytes[2] |= 0x10) : (btn_bytes[2] &= ~0x10); break;
-        default: break;
+const hid_device_ops_t* hid_get_device_ops(dev_type_t type) {
+    switch (type) {
+        case DEVICE_TYPE_PRO2:
+            return &pro2_hid_ops;
+        case DEVICE_TYPE_JOYCON:
+            // TODO return &joycon_hid_ops;
+            ESP_LOGW(LOG_HID, "JoyCon support not implemented yet");
+            return NULL;
+        default:
+            ESP_LOGE(LOG_HID, "Unknown device type: %d", type);
+            return NULL;
     }
 }
 
-void pro2_press_button(pro2_hid_report_t *report, pro2_btns btn) {
-    pro2_set_button(report, btn, true);
+void hid_report_init(hid_device_report_t *report) {
+    if (report == NULL) return;
+    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
+    if (ops && ops->report_init) {
+        ops->report_init(report);
+    }
 }
 
-void pro2_release_button(pro2_hid_report_t *report, pro2_btns btn) {
-    pro2_set_button(report, btn, false);
+void hid_set_button(hid_device_report_t *report, uint16_t btn_id, bool pressed) {
+    if (report == NULL) return;
+    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
+    if (ops && ops->set_button) {
+        ops->set_button(report, btn_id, pressed);
+    }
+}
+
+void hid_set_left_stick(hid_device_report_t *report, uint16_t x, uint16_t y) {
+    if (report == NULL) return;
+    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
+    if (ops && ops->set_left_stick) {
+        ops->set_left_stick(report, x, y);
+    }
+}
+
+void hid_set_right_stick(hid_device_report_t *report, uint16_t x, uint16_t y) {
+    if (report == NULL) return;
+    const hid_device_ops_t* ops = hid_get_device_ops(report->type);
+    if (ops && ops->set_right_stick) {
+        ops->set_right_stick(report, x, y);
+    }
 }
 
 // hid report send task
@@ -117,28 +81,35 @@ static void hid_task(void *arg) {
         }
 
         if (g_hid_double_buffer.front_buffer != NULL) {
+            const hid_device_ops_t *ops = hid_get_device_ops(g_hid_double_buffer.front_buffer->type);
+            if (ops != NULL || ops->next_report == NULL || ops->report_size == NULL) {
+                ESP_LOGE(LOG_HID, "No valid device operations for type %d", g_hid_double_buffer.front_buffer->type);
+                continue;
+            }
+            
             // Check and perform buffer swap if requested
             if (g_hid_double_buffer.swap_request) {
                 // Atomically swap front and back buffer pointers
-                pro2_hid_report_t* temp = g_hid_double_buffer.front_buffer;
+                hid_device_report_t* temp = g_hid_double_buffer.front_buffer;
                 g_hid_double_buffer.front_buffer = g_hid_double_buffer.back_buffer;
                 g_hid_double_buffer.back_buffer = temp;
 
                 // Clear swap request
                 g_hid_double_buffer.swap_request = 0;
-
-                // Update global pointer for compatibility
-                pro2_hid_report = g_hid_double_buffer.front_buffer;
             }
 
             // Update report counter, wrap around 0-255
-            g_hid_double_buffer.front_buffer->counter++;
-
-            // Send HID report (using front buffer)
-            int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
-                                (uint8_t*)g_hid_double_buffer.front_buffer, sizeof(pro2_hid_report_t));
-            if (rc != 0) {
-                ESP_LOGW(LOG_HID, "hid report send failed, rc: %d", rc);
+            uint8_t* next_report = ops->next_report(g_hid_double_buffer.front_buffer);
+            size_t report_size = ops->report_size();
+            if (next_report != NULL) {
+                // Send HID report (using front buffer)
+                int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
+                                    next_report, report_size);
+                if (rc != 0) {
+                    ESP_LOGW(LOG_HID, "hid report send failed, rc: %d", rc);
+                }
+            } else {
+                ESP_LOGW(LOG_HID, "hid report is NULL");
             }
         }
 
@@ -153,47 +124,44 @@ void hid_start_task(void) {
         return;
     }
 
-    if (g_dev_controller.type == DEVICE_TYPE_PRO2) {
-        // allocate double buffer memory
-        if (g_hid_double_buffer.front_buffer == NULL) {
-            g_hid_double_buffer.front_buffer = (pro2_hid_report_t*)malloc(sizeof(pro2_hid_report_t));
-            g_hid_double_buffer.back_buffer = (pro2_hid_report_t*)malloc(sizeof(pro2_hid_report_t));
-            g_hid_double_buffer.swap_request = 0;
-
-            if (g_hid_double_buffer.front_buffer == NULL || g_hid_double_buffer.back_buffer == NULL) {
-                ESP_LOGE(LOG_HID, "malloc hid report double buffer memory failed");
-                // Clean up if one allocation succeeded
-                if (g_hid_double_buffer.front_buffer != NULL) {
-                    free(g_hid_double_buffer.front_buffer);
-                    g_hid_double_buffer.front_buffer = NULL;
-                }
-                if (g_hid_double_buffer.back_buffer != NULL) {
-                    free(g_hid_double_buffer.back_buffer);
-                    g_hid_double_buffer.back_buffer = NULL;
-                }
-                return;
-            }
-
-            // Initialize both buffers
-            pro2_report_init(g_hid_double_buffer.front_buffer);
-            pro2_report_init(g_hid_double_buffer.back_buffer);
-
-            // Set global pointer for compatibility
-            pro2_hid_report = g_hid_double_buffer.front_buffer;
-        }
-
-        // create task for sending hid report
-        BaseType_t rc = xTaskCreate(hid_task, "hid_task", 4096, NULL, 5, &hid_task_handle);
-        if (rc != pdPASS) {
-            ESP_LOGE(LOG_HID, "create hid report task failed, rc: %d", rc);
-            free(pro2_hid_report);
-            pro2_hid_report = NULL;
-        }
-    } else {
-        // TODO JoyCon Support
-        ESP_LOGE(LOG_HID, "hid report task not supported for device type: %d", g_dev_controller.type);
+    // malloc double buffer memory
+    if (g_hid_double_buffer.front_buffer == NULL) {
+        g_hid_double_buffer.front_buffer = (hid_device_report_t*)malloc(sizeof(hid_device_report_t));
+        g_hid_double_buffer.back_buffer = (hid_device_report_t*)malloc(sizeof(hid_device_report_t));
+        g_hid_double_buffer.swap_request = 0;
     }
+
+    if (g_hid_double_buffer.front_buffer == NULL || g_hid_double_buffer.back_buffer == NULL) {
+        ESP_LOGE(LOG_HID, "malloc hid report double buffer memory failed");
+        goto error;
+    }
+
+    const hid_device_ops_t *ops = hid_get_device_ops(g_dev_controller.type);
+    ops->report_init(g_hid_double_buffer.front_buffer);
+    ops->report_init(g_hid_double_buffer.back_buffer);
     
+    if (g_hid_double_buffer.front_buffer->report == NULL || g_hid_double_buffer.back_buffer->report == NULL) {
+        ESP_LOGE(LOG_HID, "malloc hid report double buffer memory failed");
+        goto error;
+    }
+
+    BaseType_t rc = xTaskCreate(hid_task, "hid_task", 4096, NULL, 5, &hid_task_handle);
+    if (rc != pdPASS) {
+        ESP_LOGE(LOG_HID, "create hid report task failed, rc: %d", rc);
+        goto error;
+    }
+    return;
+error:
+    // Clean up
+    if (g_hid_double_buffer.front_buffer != NULL) {
+        free(g_hid_double_buffer.front_buffer);
+        g_hid_double_buffer.front_buffer = NULL;
+    }
+    if (g_hid_double_buffer.back_buffer != NULL) {
+        free(g_hid_double_buffer.back_buffer);
+        g_hid_double_buffer.back_buffer = NULL;
+    }
+    return;
 }
 
 void hid_stop_task(void) {
@@ -202,7 +170,7 @@ void hid_stop_task(void) {
         hid_task_handle = NULL;
     }
 
-    // Free both buffers
+    // free
     if (g_hid_double_buffer.front_buffer != NULL) {
         free(g_hid_double_buffer.front_buffer);
         g_hid_double_buffer.front_buffer = NULL;
@@ -212,7 +180,26 @@ void hid_stop_task(void) {
         g_hid_double_buffer.back_buffer = NULL;
     }
 
-    // Reset global pointer
-    pro2_hid_report = NULL;
     g_hid_double_buffer.swap_request = 0;
+}
+
+
+// 12 bits stick data packed into 3 bytes
+void pack_stick_data(uint8_t out[3], uint16_t x, uint16_t y) {
+    // limit to 12 bits
+    x &= 0xFFF;
+    y &= 0xFFF;
+    // packed format: byte0=x[7:0], byte1=(y[3:0]<<4)|x[11:8], byte2=y[11:4]
+    out[0] = x & 0xFF;
+    out[1] = ((y & 0x0F) << 4) | ((x >> 8) & 0x0F);
+    out[2] = (y >> 4) & 0xFF;
+}
+
+void unpack_stick_data(const uint8_t in[3], uint16_t *x, uint16_t *y) {
+    // packed format: byte0=x[7:0], byte1=(y[3:0]<<4)|x[11:8], byte2=y[11:4]
+    *x = in[0] | ((in[1] & 0x0F) << 8);
+    *y = ((in[1] >> 4) & 0x0F) | (in[2] << 4);
+    // ensure 12 bits limit (though input should already be valid)
+    *x &= 0xFFF;
+    *y &= 0xFFF;
 }

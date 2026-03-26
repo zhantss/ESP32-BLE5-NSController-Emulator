@@ -15,166 +15,11 @@
 // Global UART manager
 dev_uart_manager_t g_uart_manager = {
     .event_queue = NULL,
-    // .report_mutex = NULL,
     .uart_task_handle = NULL,
     .initialized = false,
     .current_protocol = UART_PROTOCOL_SIMPLE,
     .protocol_impl = NULL,
-    .protocol_stats = {0}
 };
-
-// Simple protocol format:
-// Frame format: [START_BYTE][TYPE][DATA...][CHECKSUM]
-#define UART_START_BYTE         0xAA
-#define UART_TYPE_BUTTON        0x01
-#define UART_TYPE_STICK         0x02
-// #define UART_MAX_FRAME_SIZE     16
-
-const pro2_btns button_map[] = {
-    // ID 0-7: 4 non-direction buttons in pro2_btn_bits_t byte 0
-    B,      // ID 0 (enum 0)
-    A,      // ID 1 (enum 1)
-    Y,      // ID 2 (enum 2)
-    X,      // ID 3 (enum 3)
-    R,      // ID 4 (enum 4)
-    ZR,     // ID 5 (enum 5)
-    Plus,   // ID 6 (enum 6)
-    RClick, // ID 7 (enum 7)
-
-    // ID 8-11: 4 non-direction buttons in pro2_btn_bits_t byte 1
-    L,      // ID 8 (enum 12) - skip Down,Right,Left,Up
-    ZL,     // ID 9 (enum 13)
-    Minus,  // ID 10 (enum 14)
-    LClick, // ID 11 (enum 15)
-
-    // ID 12-15: 4 buttons in pro2_btn_bits_t byte 2 (excluding C)
-    Home,   // ID 12 (enum 16)
-    Capture,// ID 13 (enum 17)
-    GR,     // ID 14 (enum 18)
-    GL,     // ID 15 (enum 19)
-
-    // Note: Direction buttons (Down,Right,Left,Up) and C button are not in button_map
-    // They are handled separately
-};
-const size_t BUTTON_MAP_SIZE = 16;  // 16 non-direction, non-C buttons
-
-// Process HAT direction and update direction buttons in specified buffer
-static void process_hat_direction_internal_to_buffer(pro2_hid_report_t* buffer, uint8_t hat_value) {
-    // Extract direction part (bit0-3)
-    uint8_t direction = hat_value & 0x0F;
-
-    // Process direction buttons
-    bool up_pressed = false, down_pressed = false, left_pressed = false, right_pressed = false;
-
-    switch (direction) {
-        case HAT_UP:           up_pressed = true; break;
-        case HAT_UP_RIGHT:     up_pressed = true; right_pressed = true; break;
-        case HAT_RIGHT:        right_pressed = true; break;
-        case HAT_DOWN_RIGHT:   down_pressed = true; right_pressed = true; break;
-        case HAT_DOWN:         down_pressed = true; break;
-        case HAT_DOWN_LEFT:    down_pressed = true; left_pressed = true; break;
-        case HAT_LEFT:         left_pressed = true; break;
-        case HAT_UP_LEFT:      up_pressed = true; left_pressed = true; break;
-        case HAT_CENTER:
-        default:
-            // All directions released
-            break;
-    }
-
-    // Update direction button states in specified buffer
-    pro2_set_button(buffer, Up, up_pressed);
-    pro2_set_button(buffer, Down, down_pressed);
-    pro2_set_button(buffer, Left, left_pressed);
-    pro2_set_button(buffer, Right, right_pressed);
-}
-
-// Process EasyCon HID event to specified buffer
-static void process_ec_hid_event_to_buffer(pro2_hid_report_t* buffer, const ec_hid_event_t* hid_event) {
-    // Process 16 non-direction, non-C buttons
-    for (int i = 0; i < 16; i++) {
-        if (i < BUTTON_MAP_SIZE) {
-            pro2_btns btn = button_map[i];
-            bool pressed = (hid_event->button_mask & (1 << i)) != 0;
-            pro2_set_button(buffer, btn, pressed);
-        }
-    }
-
-    // Process HAT direction
-    process_hat_direction_internal_to_buffer(buffer, hid_event->hat_state);
-
-    // Process stick data
-    pro2_set_left_stick(buffer, hid_event->left_stick_x, hid_event->left_stick_y);
-    pro2_set_right_stick(buffer, hid_event->right_stick_x, hid_event->right_stick_y);
-}
-
-// Process Simple HID event to specified buffer
-static void process_simple_hid_event_to_buffer(pro2_hid_report_t* buffer, const simple_hid_event_t* simple_hid) {
-    // Process all 21 buttons from 3 button bytes
-    // Button bytes correspond to pro2_btn_bits_t structure
-    uint8_t* btn_bytes = (uint8_t*)simple_hid->button_bytes;
-
-    // Byte 0: B, A, Y, X, R, ZR, Plus, RClick
-    if (btn_bytes[0] & 0x01) pro2_press_button(buffer, B);
-    else pro2_release_button(buffer, B);
-    if (btn_bytes[0] & 0x02) pro2_press_button(buffer, A);
-    else pro2_release_button(buffer, A);
-    if (btn_bytes[0] & 0x04) pro2_press_button(buffer, Y);
-    else pro2_release_button(buffer, Y);
-    if (btn_bytes[0] & 0x08) pro2_press_button(buffer, X);
-    else pro2_release_button(buffer, X);
-    if (btn_bytes[0] & 0x10) pro2_press_button(buffer, R);
-    else pro2_release_button(buffer, R);
-    if (btn_bytes[0] & 0x20) pro2_press_button(buffer, ZR);
-    else pro2_release_button(buffer, ZR);
-    if (btn_bytes[0] & 0x40) pro2_press_button(buffer, Plus);
-    else pro2_release_button(buffer, Plus);
-    if (btn_bytes[0] & 0x80) pro2_press_button(buffer, RClick);
-    else pro2_release_button(buffer, RClick);
-
-    // Byte 1: Down, Right, Left, Up, L, ZL, Minus, LClick
-    if (btn_bytes[1] & 0x01) pro2_press_button(buffer, Down);
-    else pro2_release_button(buffer, Down);
-    if (btn_bytes[1] & 0x02) pro2_press_button(buffer, Right);
-    else pro2_release_button(buffer, Right);
-    if (btn_bytes[1] & 0x04) pro2_press_button(buffer, Left);
-    else pro2_release_button(buffer, Left);
-    if (btn_bytes[1] & 0x08) pro2_press_button(buffer, Up);
-    else pro2_release_button(buffer, Up);
-    if (btn_bytes[1] & 0x10) pro2_press_button(buffer, L);
-    else pro2_release_button(buffer, L);
-    if (btn_bytes[1] & 0x20) pro2_press_button(buffer, ZL);
-    else pro2_release_button(buffer, ZL);
-    if (btn_bytes[1] & 0x40) pro2_press_button(buffer, Minus);
-    else pro2_release_button(buffer, Minus);
-    if (btn_bytes[1] & 0x80) pro2_press_button(buffer, LClick);
-    else pro2_release_button(buffer, LClick);
-
-    // Byte 2: Home, Capture, GR, GL, C, reserved(3 bits)
-    if (btn_bytes[2] & 0x01) pro2_press_button(buffer, Home);
-    else pro2_release_button(buffer, Home);
-    if (btn_bytes[2] & 0x02) pro2_press_button(buffer, Capture);
-    else pro2_release_button(buffer, Capture);
-    if (btn_bytes[2] & 0x04) pro2_press_button(buffer, GR);
-    else pro2_release_button(buffer, GR);
-    if (btn_bytes[2] & 0x08) pro2_press_button(buffer, GL);
-    else pro2_release_button(buffer, GL);
-    if (btn_bytes[2] & 0x10) pro2_press_button(buffer, C);
-    else pro2_release_button(buffer, C);
-
-    // Process stick data
-    pro2_set_left_stick(buffer, simple_hid->left_stick_x, simple_hid->left_stick_y);
-    pro2_set_right_stick(buffer, simple_hid->right_stick_x, simple_hid->right_stick_y);
-}
-
-dev_uart_event_type_t dev_uart_parse_frame(const uint8_t* data, size_t len, dev_uart_event_t* event) {
-    // Use protocol abstraction layer
-    if (g_uart_manager.protocol_impl == NULL) {
-        ESP_LOGE(LOG_UART, "No protocol implementation selected");
-        return UART_EVENT_UNKNOWN;
-    }
-
-    return uart_protocol_parse_frame(g_uart_manager.protocol_impl, data, len, event);
-}
 
 static void uart_rx_task(void *arg) {
     uint8_t data[UART_RX_BUFFER_SIZE];
@@ -182,7 +27,6 @@ static void uart_rx_task(void *arg) {
     size_t frame_pos = 0;
     bool in_frame = false;
     const uart_protocol_impl_t* current_impl = NULL;
-    const size_t MAX_HEADER_DETECT_LEN = 8; // Maximum bytes needed for protocol detection
 
     ESP_LOGI(LOG_UART, "UART RX task started");
 
@@ -200,90 +44,53 @@ static void uart_rx_task(void *arg) {
                 continue;
             }
 
+            size_t header_size = current_impl->get_frame_header_size();
+            size_t frame_size = 0;
+
             for (int i = 0; i < len; i++) {
                 uint8_t byte = data[i];
-
                 if (!in_frame) {
-                    // Add byte to frame buffer for detection
-                    if (frame_pos < UART_MAX_FRAME_SIZE) {
-                        frame_buffer[frame_pos++] = byte;
+                    if (header_size == 0) {
+                        // header not needed, start frame immediately
+                        in_frame = true;
+                        frame_pos = 0;
+                        // no header need setting frame_size
+                        frame_size = current_impl->get_frame_size(NULL, 0);
+                        continue;
                     }
-
-                    // If buffer exceeds detection window, discard oldest byte
-                    if (frame_pos > MAX_HEADER_DETECT_LEN) {
-                        // Shift left by one byte
+                    if (frame_pos < header_size) {
+                        frame_buffer[frame_pos++] = byte;
+                        continue;
+                    }
+                    frame_size = current_impl->get_frame_size(frame_buffer, frame_pos);
+                    if (frame_size > 0) {
+                        in_frame = true;
+                    } else {
+                        // shift left by one byte
                         memmove(frame_buffer, frame_buffer + 1, frame_pos - 1);
                         frame_pos--;
                     }
-
-                    // Try to detect protocol with current buffer
-                    if (current_impl->detect_protocol != NULL) {
-                        size_t header_offset = current_impl->detect_protocol(frame_buffer, frame_pos);
-                        if (header_offset > 0) {
-                            // Convert back to 0-based offset
-                            header_offset--;
-
-                            // If header not at start, shift buffer to align
-                            if (header_offset > 0) {
-                                memmove(frame_buffer, frame_buffer + header_offset, frame_pos - header_offset);
-                                frame_pos -= header_offset;
-                                ESP_LOGD(LOG_UART, "Aligned frame header, offset %d, new buffer size %d", header_offset, frame_pos);
-                            }
-
-                            // Start frame collection
-                            in_frame = true;
-                            ESP_LOGD(LOG_UART, "Frame start detected, buffer size %d", frame_pos);
-                        }
-                    }
                 } else {
-                    // Continue frame collection
-                    if (frame_pos < UART_MAX_FRAME_SIZE) {
+                    if (frame_pos < frame_size) {
                         frame_buffer[frame_pos++] = byte;
-                    } else {
-                        // Frame too long
-                        ESP_LOGW(LOG_UART, "Frame too long, resetting");
-                        in_frame = false;
-                        frame_pos = 0;
                         continue;
                     }
-
-                    // Check if we have a complete frame
-                    bool frame_complete = false;
-                    size_t expected_size = 0;
-
-                    if (current_impl->get_expected_frame_size != NULL) {
-                        expected_size = current_impl->get_expected_frame_size(frame_buffer, frame_pos);
-                        if (expected_size > 0 && frame_pos >= expected_size) {
-                            frame_complete = true;
-                        }
-                    }
-
-                    // If protocol doesn't know expected size, try parsing after minimum bytes
-                    if (!frame_complete && frame_pos >= 4) {
-                        // Try parsing anyway for protocols without get_expected_frame_size
-                        frame_complete = true;
-                    }
-
-                    if (frame_complete) {
-                        dev_uart_event_t event;
-                        dev_uart_event_type_t type = dev_uart_parse_frame(frame_buffer, frame_pos, &event);
-
-                        if (type != UART_EVENT_UNKNOWN) {
-                            // Valid frame, send to queue
-                            if (g_uart_manager.event_queue != NULL) {
-                                if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
-                                    ESP_LOGW(LOG_UART, "Event queue full, dropping event");
-                                }
+                    dev_uart_event_t event;
+                    dev_uart_event_type_t type = uart_protocol_parse_frame(current_impl, frame_buffer, frame_size, &event);
+                    if (type != UART_EVENT_UNKNOWN) {
+                        if (g_uart_manager.event_queue != NULL) {
+                            if (xQueueSend(g_uart_manager.event_queue, &event, 0) != pdTRUE) {
+                                ESP_LOGW(LOG_UART, "Event queue full, dropping event");
                             }
-                            ESP_LOGD(LOG_UART, "Frame parsed successfully, type=%d", type);
-                        } else {
-                            ESP_LOGD(LOG_UART, "Frame parsing failed");
                         }
-
-                        // Reset for next frame
-                        in_frame = false;
-                        frame_pos = 0;
+                        ESP_LOGD(LOG_UART, "Frame parsed successfully, type=%d", type);
+                    } else {
+                        ESP_LOGD(LOG_UART, "Frame parsing failed");
                     }
+                    // reset 
+                    in_frame = false;
+                    frame_pos = 0;
+                    frame_size = 0;
                 }
             }
         }
@@ -305,9 +112,6 @@ int dev_uart_init(void) {
         ESP_LOGE(LOG_UART, "Failed to create event queue");
         return -1;
     }
-
-    // Note: Mutex for HID report access is no longer needed with double buffering
-    // The g_uart_manager.report_mutex field is kept for compatibility but not used
 
     // Configure UART parameters
     uart_config_t uart_config = {
@@ -342,9 +146,6 @@ int dev_uart_init(void) {
     ESP_LOGI(LOG_UART, "UART initialized on port %d, baud rate %d", UART_PORT_NUM, UART_BAUD_RATE);
     ESP_LOGI(LOG_UART, "RX pin: GPIO%d, TX pin: GPIO%d", UART_RX_PIN, UART_TX_PIN);
 
-    // Initialize protocol system
-    uart_protocol_init_all();
-
     // Set default protocol based on configuration
     uart_protocol_t configured_protocol = uart_protocol_get_configured();
 
@@ -354,8 +155,6 @@ int dev_uart_init(void) {
         dev_uart_set_protocol(UART_PROTOCOL_SIMPLE);
     }
 
-    ESP_LOGI(LOG_UART, "Protocol set to: %s", uart_protocol_get_name(configured_protocol));
-
     g_uart_manager.initialized = true;
     return 0;
 
@@ -364,7 +163,6 @@ error:
         vQueueDelete(g_uart_manager.event_queue);
         g_uart_manager.event_queue = NULL;
     }
-    // Note: report_mutex is no longer used with double buffering
     return -1;
 }
 
@@ -406,13 +204,11 @@ void dev_uart_deinit(void) {
         g_uart_manager.event_queue = NULL;
     }
 
-    // Note: report_mutex is no longer used with double buffering
-
     // Uninstall UART driver
     uart_driver_delete(UART_PORT_NUM);
 
     g_uart_manager.initialized = false;
-    ESP_LOGI(LOG_UART, "UART deinitialized");
+    ESP_LOGI(LOG_UART, "UART deinitialize");
 }
 
 bool dev_uart_get_event(dev_uart_event_t* event) {
@@ -433,48 +229,11 @@ void dev_uart_process_events(void) {
 
     while (dev_uart_get_event(&event)) {
         events_processed = true;
-
-        // Directly update back buffer, no mutex needed
-        if (g_hid_double_buffer.back_buffer != NULL) {
-            // Process event based on type
-            switch (event.type) {
-                case UART_EVENT_EC_HID:
-                    process_ec_hid_event_to_buffer(g_hid_double_buffer.back_buffer, &event.data.ec_hid);
-                    ESP_LOGD(LOG_UART, "Processed HID event to back buffer: buttons=0x%04X, hat=0x%02X",
-                             event.data.ec_hid.button_mask, event.data.ec_hid.hat_state);
-                    break;
-
-                case UART_EVENT_SIMPLE_HID:
-                    process_simple_hid_event_to_buffer(g_hid_double_buffer.back_buffer, &event.data.simple_hid);
-                    ESP_LOGD(LOG_UART, "Processed full HID event to back buffer: buttons=0x%02X%02X%02X",
-                             event.data.simple_hid.button_bytes[0],
-                             event.data.simple_hid.button_bytes[1],
-                             event.data.simple_hid.button_bytes[2]);
-                    break;
-
-                case UART_EVENT_SIMPLE_MANAGEMENT:
-                    // Handle management commands
-                    ESP_LOGD(LOG_UART, "Management event: command=0x%02X",
-                             event.data.management.command);
-                    // TODO: Implement management command handling
-                    // (handshake, heartbeat, reboot, etc.)
-                    break;
-
-                case UART_EVENT_SIMPLE_SENSOR:
-                    // Handle sensor data
-                    ESP_LOGD(LOG_UART, "Sensor event: type=0x%02X, data=0x%02X%02X%02X%02X",
-                             event.data.sensor.sensor_type,
-                             event.data.sensor.sensor_data[0],
-                             event.data.sensor.sensor_data[1],
-                             event.data.sensor.sensor_data[2],
-                             event.data.sensor.sensor_data[3]);
-                    // TODO: Process sensor data as needed
-                    break;
-
-                case UART_EVENT_UNKNOWN:
-                default:
-                    ESP_LOGD(LOG_UART, "Unknown event type: %d", event.type);
-                    break;
+        if (event.type != UART_EVENT_UNKNOWN) {
+            int rc = g_uart_manager.protocol_impl->process_event(
+                g_hid_double_buffer.back_buffer, &event);
+            if (rc != 0) {
+                ESP_LOGE(LOG_UART, "Failed to process event: %d", event.type);
             }
         }
     }
@@ -521,27 +280,9 @@ int dev_uart_set_protocol(uart_protocol_t protocol) {
         return -1;
     }
 
-    // Deinitialize old protocol if needed
-    if (g_uart_manager.protocol_impl != NULL &&
-        g_uart_manager.protocol_impl->deinit_protocol != NULL) {
-        g_uart_manager.protocol_impl->deinit_protocol();
-    }
-
-    // Initialize new protocol
-    if (new_impl->init_protocol != NULL) {
-        new_impl->init_protocol();
-    }
-
     // Update manager
     g_uart_manager.current_protocol = protocol;
     g_uart_manager.protocol_impl = new_impl;
-
-    // Update statistics
-    uart_protocol_update_stats_protocol_switch();
-
-    ESP_LOGI(LOG_UART, "Protocol switched to: %s (v%s)",
-             new_impl->name,
-             new_impl->get_version != NULL ? new_impl->get_version() : "unknown");
 
     return 0;
 }
@@ -550,22 +291,6 @@ uart_protocol_t dev_uart_get_protocol(void) {
     return g_uart_manager.current_protocol;
 }
 
-void dev_uart_get_protocol_stats(uart_protocol_stats_t* stats) {
-    if (stats != NULL) {
-        // Combine global stats with manager stats
-        uart_protocol_get_stats(stats);
-        // Also include manager stats if needed
-        stats->protocol_switches = g_uart_manager.protocol_stats.protocol_switches;
-    }
-}
-
-void dev_uart_reset_protocol_stats(void) {
-    uart_protocol_reset_stats();
-    memset(&g_uart_manager.protocol_stats, 0, sizeof(uart_protocol_stats_t));
-    ESP_LOGI(LOG_UART, "Protocol statistics reset");
-}
-
 void dev_uart_set_debug_logging(bool enable) {
     uart_protocol_set_debug(enable);
-    ESP_LOGI(LOG_UART, "Debug logging %s", enable ? "enabled" : "disabled");
 }

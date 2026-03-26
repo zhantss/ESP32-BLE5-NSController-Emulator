@@ -18,12 +18,6 @@ void app_main(void)
         ESP_LOGE(LOG_APP, "Failed to initialize UART, continuing without serial input");
     } else {
         ESP_LOGI(LOG_APP, "UART initialized successfully");
-
-        // Log protocol information
-        uart_protocol_t current_protocol = dev_uart_get_protocol();
-        const char* protocol_name = uart_protocol_get_name(current_protocol);
-        ESP_LOGI(LOG_APP, "UART Protocol: %s", protocol_name);
-
         // Start UART RX task
         if (dev_uart_start_task() == 0) {
             ESP_LOGI(LOG_APP, "UART RX task started");

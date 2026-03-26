@@ -47,15 +47,6 @@ bool dev_uart_get_event(dev_uart_event_t* event);
 void dev_uart_process_events(void);
 
 /**
- * @brief Parse UART data frame
- * @param data Raw UART data
- * @param len Length of data
- * @param event Output event (if valid frame)
- * @return Event type if valid frame, UART_EVENT_UNKNOWN otherwise
- */
-dev_uart_event_type_t dev_uart_parse_frame(const uint8_t* data, size_t len, dev_uart_event_t* event);
-
-/**
  * @brief Send data via UART (for debugging/response)
  * @param data Data to send
  * @param len Length of data
@@ -75,17 +66,6 @@ int dev_uart_set_protocol(uart_protocol_t protocol);
  * @return Current protocol type
  */
 uart_protocol_t dev_uart_get_protocol(void);
-
-/**
- * @brief Get protocol statistics
- * @param stats Output statistics structure
- */
-void dev_uart_get_protocol_stats(uart_protocol_stats_t* stats);
-
-/**
- * @brief Reset protocol statistics
- */
-void dev_uart_reset_protocol_stats(void);
 
 /**
  * @brief Enable/disable protocol debug logging
