@@ -1,0 +1,4 @@
+# EasyCon协议测试脚本依赖
+# 安装命令: pip install -r requirements.txt
+
+pyserial>=3.5,<4.0  # 串口通信库
