@@ -95,36 +95,46 @@ static uint16_t ec_scale_stick_value(uint8_t easycon_value) {
 }
 
 static size_t ec_get_frame_header_size() {
-    if (ec_state == EC_IDLE) {
-        return 2;
-    }
-    // no header
-    return 0;
+    // EASYCON_CMD_READY or others(hid no header)
+    // HELLO -> READY|READY|HELLO
+    // ScriptStart and others -> READY|_CMD
+    // TODO FLASH
+    // Judge in get_frame_size
+    return 2;
 }
 
 static size_t ec_get_frame_size(const uint8_t* header, size_t len) {
-    switch (ec_state) {
-        case EC_IDLE:
-            if (len == 2  && header[0] == EASYCON_CMD_READY && header[2] == EASYCON_CMD_READY) {
-                // handshake
-                return 3;
-            }
-            break;
-        case EC_HID:
-            // EasyCon protocol always uses 8-byte encoded frames
-            // buttons(2), hat(1), sticks(4), end(1)[|=0x80] = 8 bytes
-            return EASYCON_PROTOCOL_ENCODED_SIZE;
-        // TODO 2 or 8
-        default:
-            break;
+    if (len != 2) return 0;
+    if (header[0] == EASYCON_CMD_READY) {
+        // CMD
+        if (header[1] == EASYCON_CMD_READY) {
+            // hello and heartbeat -> 3
+            return EASYCON_PROTOCOL_HELLO_SIZE;
+        }
+        // TODO FLASH
+        // others
+        return 2;
+    } else {
+        // HID
+        // buttons(2) | hat(1) | sticks(4) | END_MARKER(1)
+        return EASYCON_PROTOCOL_ENCODED_SIZE;
     }
-    (void)header;   // Unused parameter
-    (void)len;      // Unused parameter
-    
-    return EASYCON_PROTOCOL_ENCODED_SIZE;
 }
 
 static dev_uart_event_type_t ec_parse_frame(const uint8_t* frame_data, size_t len, dev_uart_event_t* event) {
+    if (len == EASYCON_PROTOCOL_HELLO_SIZE) {
+        event->type = UART_EVENT_EC_CMD;
+        event->data.ec_cmd.code = EASYCON_CMD_HELLO;
+        event->data.ec_cmd.data = 0;
+        return UART_EVENT_EC_CMD;
+    }
+    if (len == EASYCON_PROTOCOL_HELLO_SIZE - 1) {
+        event->type = UART_EVENT_EC_CMD;
+        // TODO check cmd code
+        event->data.ec_cmd.code = frame_data[1];
+        event->data.ec_cmd.data = 0;
+        return UART_EVENT_EC_CMD;
+    }
     if (len < EASYCON_PROTOCOL_ENCODED_SIZE 
         || (frame_data[len - 1] & EASYCON_PROTOCOL_END_MARKER) != 0) {
         return UART_EVENT_UNKNOWN;
@@ -208,7 +218,12 @@ static int ec_process_event(hid_device_report_t* buffer, dev_uart_event_t* event
             rsp->data = NULL;
             return 0;
         case UART_EVENT_EC_CMD:
-            // TODO handle easycon command
+            if (event->data.ec_cmd.code == EASYCON_CMD_HELLO) {
+                rsp->len = 1;
+                rsp->data = EASYCON_RPY_HELLO;
+                return 0;
+            }
+            // TODO implement other commands
             return 0;
         default:
             return -1;

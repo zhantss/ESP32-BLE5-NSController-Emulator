@@ -31,15 +31,10 @@ extern "C" {
 #define EASYCON_RPY_FLASH_END           0x82
 #define EASYCON_RPY_SCRIPT_ACK          0x83
 
-// EasyCon NS2 frame header
-#define EASYCON_NS2_HEADER_HID          0xCC
-#define EASYCON_NS2_HEADER_CMD          0xBB
-// 0xCC 7bytes hid
-// 0xCC CMD_READY CMD
-
 // EasyCon protocol constants
 #define EASYCON_PROTOCOL_ENCODED_SIZE   8   // Encoded frame size (7-bit packed)
 #define EASYCON_PROTOCOL_RAW_SIZE       7   // Raw data size before encoding
+#define EASYCON_PROTOCOL_HELLO_SIZE     3   // hello and heartbeat frame size
 #define EASYCON_PROTOCOL_END_MARKER     0x80 // Last byte bit7=1 as end marker
 
 // HAT direction values
