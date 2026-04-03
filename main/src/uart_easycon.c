@@ -12,6 +12,8 @@
 
 easycon_protocol_state_t ec_state = EC_IDLE;
 
+static uint8_t hello_rsp[] = {EASYCON_RPY_HELLO};
+
 const pro2_btns button_map[] = {
     // ID 0-7: 4 non-direction buttons in pro2_btn_bits_t byte 0
     B,      // ID 0 (enum 0)
@@ -220,7 +222,7 @@ static int ec_process_event(hid_device_report_t* buffer, dev_uart_event_t* event
         case UART_EVENT_EC_CMD:
             if (event->data.ec_cmd.code == EASYCON_CMD_HELLO) {
                 rsp->len = 1;
-                rsp->data = EASYCON_RPY_HELLO;
+                rsp->data = hello_rsp;
                 return 0;
             }
             // TODO implement other commands
