@@ -542,9 +542,11 @@ cmd_handler cmd_handler_find(uint8_t cmd) {
     return cur != NULL ? cur->handler : NULL;
 }
 
+#define CMD_PROCESS_MAX_RSP_DATA_LEN 0x78
+
 int cmd_process(pro2_gatt_rsp_t* rsp, uint8_t* data_in, uint16_t payload_len) {
     uint8_t rsp_magic[4] = { 0x10, 0x78, 0x00, 0x00 };
-    uint8_t *data_out = (uint8_t*) malloc(0x80 * sizeof(uint8_t));
+    uint8_t *data_out = (uint8_t*) malloc(CMD_PROCESS_MAX_RSP_DATA_LEN * sizeof(uint8_t));
     if (data_out == NULL) {
         ESP_LOGE(LOG_APP, "Failed to allocate memory for response data");
         return BLE_ATT_ERR_INSUFFICIENT_RES;
@@ -566,9 +568,18 @@ int cmd_process(pro2_gatt_rsp_t* rsp, uint8_t* data_in, uint16_t payload_len) {
         ESP_LOGW(LOG_APP, "unknow cmd %02x, subcmd %02x", cmd, subcmd);
         out_len = 0;
     }
+
+    // Validate response length to prevent buffer overflow
+    if (out_len > CMD_PROCESS_MAX_RSP_DATA_LEN) {
+        ESP_LOGE(LOG_APP, "Response data length too large: %d, max allowed: %d", out_len, CMD_PROCESS_MAX_RSP_DATA_LEN);
+        free(data_out);
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+    }
+
     uint8_t *result = (uint8_t*) malloc((out_len + 8 + PRO2_DATA_EMPTY_LEN) * sizeof(uint8_t));
     if (result == NULL) {
         ESP_LOGE(LOG_APP, "Failed to allocate memory for response data");
+        free(data_out);
         return BLE_ATT_ERR_INSUFFICIENT_RES;
     }
     // reset rsp data

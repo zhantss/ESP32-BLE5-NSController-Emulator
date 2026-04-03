@@ -310,7 +310,11 @@ static int gatt_svc_write_no_rsp_access(uint16_t conn_handle, uint16_t attr_hand
         free(data_buf);
         return BLE_ATT_ERR_INSUFFICIENT_RES;
       }
-      ESP_LOGI(LOG_APP, "Received data head: %02x%02x%02x%02x%02x%02x%02x%02x", 
+      // Initialize rsp_data to NULL to prevent free on uninitialized pointer
+      rsp->rsp_data = NULL;
+      rsp->rsp_len = 0;
+
+      ESP_LOGI(LOG_APP, "Received data head: %02x%02x%02x%02x%02x%02x%02x%02x",
         data_buf[0], data_buf[1], data_buf[2], data_buf[3], data_buf[4], data_buf[5], data_buf[6], data_buf[7]);
       rsp->cmd = data_buf[0];
       rsp->subcmd = data_buf[3];
@@ -321,17 +325,13 @@ static int gatt_svc_write_no_rsp_access(uint16_t conn_handle, uint16_t attr_hand
         // send notify use 0x001e
         rc = gatt_notify(conn_handle, gatt_svr_chr_001e_val_handle, rsp->rsp_data, rsp->rsp_len);
       }
-      if (rsp != NULL) {
-        if(rsp->rsp_data != NULL) {
-          free(rsp->rsp_data);
-          rsp->rsp_data = NULL;
-        }
-        free(rsp);
-        rsp = NULL;
+
+      // Cleanup allocated resources
+      if (rsp->rsp_data != NULL) {
+        free(rsp->rsp_data);
       }
-      if (data_buf != NULL) {
-        free(data_buf);
-      }
+      free(rsp);
+      free(data_buf);
       return rc;
     } else if (attr_handle == gatt_svr_chr_0012_val_handle) {
       // 0x0012 handle no rsp
