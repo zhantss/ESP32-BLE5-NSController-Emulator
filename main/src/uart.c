@@ -257,16 +257,16 @@ void dev_uart_process_events(void) {
 
     dev_uart_event_t event;
     dev_uart_event_rsp_t rsp;
-    bool events_processed = false;
 
-    while (dev_uart_get_event(&event)) {
-        events_processed = true;
+    // Process only one event per call to prevent multiple HID events
+    // from overwriting the back_buffer within a single task tick.
+    if (dev_uart_get_event(&event)) {
         if (event.type != UART_EVENT_UNKNOWN) {
-            int rc = 0;
-            rc = g_uart_manager.protocol_impl->process_event(
+            int rc = g_uart_manager.protocol_impl->process_event(
                 g_hid_double_buffer.back_buffer, &event, &rsp);
             if (rc != 0) {
                 ESP_LOGE(LOG_UART, "Failed to process event: %d", event.type);
+                return;
             } else if (rsp.len > 0) {
                 rc = dev_uart_send_data(rsp.data, rsp.len);
                 if (rc != 0) {
@@ -274,14 +274,12 @@ void dev_uart_process_events(void) {
                 }
                 rsp.len = 0;    // Clear response buffer
             }
-        }
-    }
 
-    // If events were processed, request buffer swap
-    if (events_processed) {
-        // Ensure all writes to the back_buffer are visible to the HID task prior to setting the swap_request.
-        MEMORY_BARRIER();
-        g_hid_double_buffer.swap_request = 1;
+            // Request buffer swap after processing the event.
+            // Ensure all writes to the back_buffer are visible to the HID task prior to setting the swap_request.
+            MEMORY_BARRIER();
+            g_hid_double_buffer.swap_request = 1;
+        }
     }
 }
 
