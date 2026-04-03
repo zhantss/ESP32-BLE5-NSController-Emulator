@@ -15,11 +15,23 @@
 // Global UART manager
 dev_uart_manager_t g_uart_manager = {
     .event_queue = NULL,
-    .uart_task_handle = NULL,
+    .uart_rx_task_handle = NULL,
+    .uart_evt_task_handle = NULL,
     .initialized = false,
     .current_protocol = UART_PROTOCOL_SIMPLE,
     .protocol_impl = NULL,
 };
+
+// UART event processing task - processes events from queue and updates back buffer
+static void uart_event_process_task(void *arg) {
+    while (1) {
+        // Process all events in queue
+        dev_uart_process_events();
+
+        // Sleep 1ms when queue is empty to reduce CPU usage while maintaining responsiveness
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
 
 static void uart_rx_task(void *arg) {
     uint8_t data[UART_RX_BUFFER_SIZE];
@@ -172,27 +184,46 @@ int dev_uart_start_task(void) {
         return -1;
     }
 
-    if (g_uart_manager.uart_task_handle != NULL) {
-        ESP_LOGW(LOG_UART, "UART task already started");
-        return 0;
+    // Create UART RX task if not already running
+    if (g_uart_manager.uart_rx_task_handle == NULL) {
+        BaseType_t rc = xTaskCreate(uart_rx_task, "uart_rx", 4096, NULL, 4, &g_uart_manager.uart_rx_task_handle);
+        if (rc != pdPASS) {
+            ESP_LOGE(LOG_UART, "Failed to create UART RX task: %d", rc);
+            return -1;
+        }
+        ESP_LOGI(LOG_UART, "UART RX task started");
+    } else {
+        ESP_LOGW(LOG_UART, "UART RX task already started");
     }
 
-    // Create UART RX task
-    BaseType_t rc = xTaskCreate(uart_rx_task, "uart_rx", 4096, NULL, 4, &g_uart_manager.uart_task_handle);
-    if (rc != pdPASS) {
-        ESP_LOGE(LOG_UART, "Failed to create UART task: %d", rc);
-        return -1;
+    // Create UART event processing task if not already running
+    if (g_uart_manager.uart_evt_task_handle == NULL) {
+        BaseType_t rc = xTaskCreate(uart_event_process_task, "uart_evt", 4096, NULL, 5, &g_uart_manager.uart_evt_task_handle);
+        if (rc != pdPASS) {
+            ESP_LOGE(LOG_UART, "Failed to create UART event task: %d", rc);
+            return -1;
+        }
+        ESP_LOGI(LOG_UART, "UART event processing task started");
+    } else {
+        ESP_LOGW(LOG_UART, "UART event processing task already started");
     }
 
-    ESP_LOGI(LOG_UART, "UART RX task started");
     return 0;
 }
 
 void dev_uart_stop_task(void) {
-    if (g_uart_manager.uart_task_handle != NULL) {
-        vTaskDelete(g_uart_manager.uart_task_handle);
-        g_uart_manager.uart_task_handle = NULL;
-        ESP_LOGI(LOG_UART, "UART task stopped");
+    // Stop UART event processing task first
+    if (g_uart_manager.uart_evt_task_handle != NULL) {
+        vTaskDelete(g_uart_manager.uart_evt_task_handle);
+        g_uart_manager.uart_evt_task_handle = NULL;
+        ESP_LOGI(LOG_UART, "UART event processing task stopped");
+    }
+
+    // Stop UART RX task
+    if (g_uart_manager.uart_rx_task_handle != NULL) {
+        vTaskDelete(g_uart_manager.uart_rx_task_handle);
+        g_uart_manager.uart_rx_task_handle = NULL;
+        ESP_LOGI(LOG_UART, "UART RX task stopped");
     }
 }
 

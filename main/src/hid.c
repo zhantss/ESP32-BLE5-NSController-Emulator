@@ -72,11 +72,18 @@ static void hid_task(void *arg) {
                 g_hid_double_buffer.swap_request = 0;
             }
 
-            // Update report counter, wrap around 0-255
-            uint8_t* next_report = ops->next_report(g_hid_double_buffer.front_buffer);
+            // Get report size for this device type
             size_t report_size = ops->report_size();
+
+            // Use local buffer to avoid race condition with buffer swap
+            // Copy data before potential buffer swap to ensure data integrity
+            uint8_t report_buffer[report_size];
+            uint8_t* next_report = ops->next_report(g_hid_double_buffer.front_buffer);
+            memcpy(report_buffer, next_report, report_size);
+
+            // Send report from local buffer - safe even if buffer swap occurs
             int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
-                                    next_report, report_size);
+                                    report_buffer, report_size);
             if (rc != 0) {
                 ESP_LOGW(LOG_HID, "hid report send failed, rc: %d", rc);
             }

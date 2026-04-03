@@ -112,9 +112,10 @@ typedef struct {
 
 // UART manager structure
 typedef struct {
-    QueueHandle_t event_queue;      // Queue for UART events
-    TaskHandle_t uart_task_handle;  // UART task handle
-    bool initialized;               // UART initialized flag
+    QueueHandle_t event_queue;          // Queue for UART events
+    TaskHandle_t uart_rx_task_handle;   // UART RX task handle
+    TaskHandle_t uart_evt_task_handle;  // UART event processing task handle
+    bool initialized;                   // UART initialized flag
 
     // Protocol management
     uart_protocol_t current_protocol;           // Current protocol type
