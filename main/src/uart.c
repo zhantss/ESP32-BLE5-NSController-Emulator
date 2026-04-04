@@ -3,7 +3,6 @@
 #include "device.h"
 #include "utils.h"
 #include "uart_protocol.h"
-#include "uart_easycon.h"
 
 #include "driver/uart.h"
 #include "esp_log.h"

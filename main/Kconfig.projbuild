@@ -1,0 +1,27 @@
+menu "NSController Configuration"
+
+    config MCU_DEBUG
+        bool "Enable MCU debug logging"
+        default n
+        help
+            Enable detailed debug output for MCU operations.
+
+    choice UART_PROTOCOL_CHOICE
+        prompt "UART Protocol"
+        default UART_PROTOCOL_SIMPLE
+        help
+            Select the UART communication protocol.
+
+        config UART_PROTOCOL_SIMPLE
+            bool "Simple protocol (default)"
+
+        config UART_PROTOCOL_EASYCON
+            bool "EasyCon protocol"
+    endchoice
+
+    config UART_PROTOCOL
+        int
+        default 0 if UART_PROTOCOL_SIMPLE
+        default 1 if UART_PROTOCOL_EASYCON
+
+endmenu
