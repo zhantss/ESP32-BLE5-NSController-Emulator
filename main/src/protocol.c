@@ -489,7 +489,7 @@ static uint8_t cmd_0x18_handler(const uint8_t subcmd, const uint16_t payload_len
     switch(subcmd) {
         case 0x01:
             // 00 00 40 f0 00 00 60 00
-            data_out[0] = 0x01;
+            data_out[0] = 0x00;
             data_out[1] = 0x00;
             data_out[2] = 0x40;
             data_out[3] = 0xf0;
