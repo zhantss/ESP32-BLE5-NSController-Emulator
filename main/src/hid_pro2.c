@@ -4,6 +4,8 @@
 #include "esp_log.h"
 
 const uint8_t pro2_firmware_info[12] = {
+  // 1.0.14(firmware version) | Pro2 | 12.0.0 (Bluetooth patch version)
+  // 0x00 | DSP firmware version, Only present on Pro Controller with updated firmware | 0xff
   0x01, 0x00, 0x0e, 0x02, 0x0c, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
 };
 
