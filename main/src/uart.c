@@ -299,10 +299,10 @@ int dev_uart_send_data(const uint8_t* data, size_t len) {
 // Protocol management functions
 
 int dev_uart_set_protocol(uart_protocol_t protocol) {
-    if (!g_uart_manager.initialized) {
-        ESP_LOGE(LOG_UART, "UART not initialized");
-        return -1;
-    }
+    // if (!g_uart_manager.initialized) {
+    //     ESP_LOGE(LOG_UART, "UART not initialized");
+    //     return -1;
+    // }
 
     // Check if protocol is changing
     if (g_uart_manager.current_protocol == protocol &&
