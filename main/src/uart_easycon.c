@@ -221,6 +221,7 @@ static int ec_process_event(hid_device_report_t* buffer, dev_uart_event_t* event
             return 0;
         case UART_EVENT_EC_CMD:
             if (event->data.ec_cmd.code == EASYCON_CMD_HELLO) {
+                ESP_LOGI(LOG_EASYCON, "Received Hello command");
                 rsp->len = 1;
                 rsp->data = hello_rsp;
                 return 0;

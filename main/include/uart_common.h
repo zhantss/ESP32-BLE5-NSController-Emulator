@@ -16,7 +16,14 @@ extern "C" {
 
 // #define BUTTON_MAP_SIZE (sizeof(button_map) / sizeof(button_map[0]))
 
-// UART Configuration
+// Transport layer selection
+#if CONFIG_TRANSPORT_LAYER_USB_SERIAL_JTAG
+    #define TRANSPORT_USE_USB_SERIAL_JTAG   1
+#else
+    #define TRANSPORT_USE_USB_SERIAL_JTAG   0
+#endif
+
+// UART Configuration (used when TRANSPORT_USE_USB_SERIAL_JTAG == 0)
 #define UART_PORT_NUM           UART_NUM_1
 #define UART_BAUD_RATE          115200
 #define UART_RX_BUFFER_SIZE     1024

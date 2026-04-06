@@ -8,6 +8,10 @@
 #include "esp_log.h"
 #include "string.h"
 
+#if TRANSPORT_USE_USB_SERIAL_JTAG
+#include "usb_serial_jtag.h"
+#endif
+
 // Log tag
 #define LOG_UART "uart"
 
@@ -40,13 +44,29 @@ static void uart_rx_task(void *arg) {
     uint8_t data[UART_RX_BUFFER_SIZE];
     uint8_t frame_buffer[UART_MAX_FRAME_SIZE];
     size_t frame_pos = 0;
+    size_t frame_size = 0;
     bool in_frame = false;
     const uart_protocol_impl_t* current_impl = NULL;
 
-    ESP_LOGI(LOG_UART, "UART RX task started");
+    ESP_LOGI(LOG_UART, "UART RX task started (transport: %s)",
+#if TRANSPORT_USE_USB_SERIAL_JTAG
+             "USB Serial/JTAG"
+#else
+             "UART"
+#endif
+            );
 
     while (1) {
+#if TRANSPORT_USE_USB_SERIAL_JTAG
+        // Check if USB is connected before reading
+        if (!dev_usb_serial_jtag_is_connected()) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+        int len = dev_usb_serial_jtag_read_bytes(data, sizeof(data), 10);
+#else
         int len = uart_read_bytes(UART_PORT_NUM, data, sizeof(data), pdMS_TO_TICKS(10));
+#endif
 
         if (len > 0) {
             ESP_LOGD(LOG_UART, "Received %d bytes", len);
@@ -60,52 +80,69 @@ static void uart_rx_task(void *arg) {
             }
 
             size_t header_size = current_impl->get_frame_header_size();
-            size_t frame_size = 0;
 
             for (int i = 0; i < len; i++) {
                 uint8_t byte = data[i];
+
+                // State machine for frame parsing
                 if (!in_frame) {
-                    if (header_size == 0) {
-                        // header not needed, start frame immediately
+                    // Case 1: No header protocol - start frame immediately on first byte
+                    if (header_size == 0 && frame_pos == 0) {
                         in_frame = true;
-                        frame_pos = 0;
-                        // no header need setting frame_size
                         frame_size = current_impl->get_frame_size(NULL, 0);
-                        continue;
+                        ESP_LOGI(LOG_UART, "Frame started (no header), size: %d", frame_size);
+                        // Fall through to store current byte as first data byte
                     }
-                    if (frame_pos < header_size) {
+                    // Case 2: Collecting header bytes
+                    else if (header_size > 0 && frame_pos < header_size) {
                         frame_buffer[frame_pos++] = byte;
+                        ESP_LOGI(LOG_UART, "Header byte[%d]: 0x%02X", frame_pos - 1, byte);
                         continue;
                     }
-                    frame_size = current_impl->get_frame_size(frame_buffer, frame_pos);
-                    if (frame_size > 0) {
-                        in_frame = true;
-                    } else {
-                        // shift left by one byte
-                        memmove(frame_buffer, frame_buffer + 1, frame_pos - 1);
-                        frame_pos--;
+                    // Case 3: Header complete - determine frame size and transition to in_frame
+                    else if (header_size > 0 && frame_pos >= header_size) {
+                        frame_size = current_impl->get_frame_size(frame_buffer, frame_pos);
+                        if (frame_size > 0) {
+                            in_frame = true;
+                            ESP_LOGI(LOG_UART, "Frame started, size: %d", frame_size);
+                            // Fall through to store current byte as first data byte
+                        } else {
+                            // Invalid header, shift and retry
+                            memmove(frame_buffer, frame_buffer + 1, frame_pos - 1);
+                            frame_pos--;
+                            continue;
+                        }
                     }
-                } else {
+                }
+
+                // In-frame state: store data bytes and check for complete frame
+                if (in_frame) {
                     if (frame_pos < frame_size) {
                         frame_buffer[frame_pos++] = byte;
-                        continue;
+                        ESP_LOGI(LOG_UART, "Data byte[%d]: 0x%02X", frame_pos - 1, byte);
                     }
-                    dev_uart_event_t event;
-                    dev_uart_event_type_t type = uart_protocol_parse_frame(current_impl, frame_buffer, frame_size, &event);
-                    if (type != UART_EVENT_UNKNOWN) {
-                        if (g_uart_manager.event_queue != NULL) {
-                            if (xQueueSend(g_uart_manager.event_queue, &event, 1) != pdTRUE) {
-                                ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+
+                    // Check if frame is complete
+                    if (frame_pos >= frame_size) {
+                        ESP_LOGI(LOG_UART, "Frame complete, size: %d", frame_size);
+                        dev_uart_event_t event;
+                        dev_uart_event_type_t type = uart_protocol_parse_frame(current_impl, frame_buffer, frame_size, &event);
+                        if (type != UART_EVENT_UNKNOWN) {
+                            if (g_uart_manager.event_queue != NULL) {
+                                ESP_LOGI(LOG_UART, "Sending event to queue, type=%d", type);
+                                if (xQueueSend(g_uart_manager.event_queue, &event, 1) != pdTRUE) {
+                                    ESP_LOGW(LOG_UART, "Event queue full, dropping event");
+                                }
                             }
+                            ESP_LOGD(LOG_UART, "Frame parsed successfully, type=%d", type);
+                        } else {
+                            ESP_LOGD(LOG_UART, "Frame parsing failed");
                         }
-                        ESP_LOGD(LOG_UART, "Frame parsed successfully, type=%d", type);
-                    } else {
-                        ESP_LOGD(LOG_UART, "Frame parsing failed");
+                        // Reset state for next frame
+                        in_frame = false;
+                        frame_pos = 0;
+                        frame_size = 0;
                     }
-                    // reset 
-                    in_frame = false;
-                    frame_pos = 0;
-                    frame_size = 0;
                 }
             }
         }
@@ -128,6 +165,15 @@ int dev_uart_init(void) {
         return -1;
     }
 
+#if TRANSPORT_USE_USB_SERIAL_JTAG
+    // Initialize USB Serial/JTAG
+    int usb_rc = dev_usb_serial_jtag_init();
+    if (usb_rc != 0) {
+        ESP_LOGE(LOG_UART, "Failed to initialize USB Serial/JTAG");
+        goto error;
+    }
+    ESP_LOGI(LOG_UART, "Transport: USB Serial/JTAG");
+#else
     // Configure UART parameters
     uart_config_t uart_config = {
         .baud_rate = UART_BAUD_RATE,
@@ -145,7 +191,7 @@ int dev_uart_init(void) {
         ESP_LOGE(LOG_UART, "Failed to install UART driver: %s", esp_err_to_name(err));
         goto error;
     }
-    
+
     err = uart_param_config(UART_PORT_NUM, &uart_config);
     if (err != ESP_OK) {
         ESP_LOGE(LOG_UART, "Failed to configure UART parameters: %s", esp_err_to_name(err));
@@ -159,8 +205,9 @@ int dev_uart_init(void) {
         goto error;
     }
 
-    ESP_LOGI(LOG_UART, "UART initialized on port %d, baud rate %d", UART_PORT_NUM, UART_BAUD_RATE);
+    ESP_LOGI(LOG_UART, "Transport: UART, port %d, baud %d", UART_PORT_NUM, UART_BAUD_RATE);
     ESP_LOGI(LOG_UART, "RX pin: GPIO%d, TX pin: GPIO%d", UART_RX_PIN, UART_TX_PIN);
+#endif
 
     // Set default protocol based on configuration
     uart_protocol_t configured_protocol = uart_protocol_get_configured();
@@ -241,11 +288,15 @@ void dev_uart_deinit(void) {
         g_uart_manager.event_queue = NULL;
     }
 
+#if TRANSPORT_USE_USB_SERIAL_JTAG
+    dev_usb_serial_jtag_deinit();
+#else
     // Uninstall UART driver
     uart_driver_delete(UART_PORT_NUM);
+#endif
 
     g_uart_manager.initialized = false;
-    ESP_LOGI(LOG_UART, "UART deinitialize");
+    ESP_LOGI(LOG_UART, "Transport deinitialized");
 }
 
 bool dev_uart_get_event(dev_uart_event_t* event) {
@@ -280,8 +331,9 @@ void dev_uart_process_events(void) {
                 ESP_LOGE(LOG_UART, "Failed to process event: %d", event.type);
                 return;
             } else if (rsp.len > 0) {
+                ESP_LOGI(LOG_UART, "Sending response: %d", rsp.len);
                 rc = dev_uart_send_data(rsp.data, rsp.len);
-                if (rc != 0) {
+                if (rc < 0) {
                     ESP_LOGE(LOG_UART, "Failed to send response: %d", event.type);
                 }
                 rsp.len = 0;    // Clear response buffer
@@ -297,15 +349,19 @@ void dev_uart_process_events(void) {
 
 int dev_uart_send_data(const uint8_t* data, size_t len) {
     if (!g_uart_manager.initialized) {
+        ESP_LOGE(LOG_UART, "uart manager not initialized");
         return -1;
     }
 
+#if TRANSPORT_USE_USB_SERIAL_JTAG
+    int bytes_written = dev_usb_serial_jtag_send_data(data, len);
+#else
     int bytes_written = uart_write_bytes(UART_PORT_NUM, (const char*)data, len);
+#endif
     if (bytes_written < 0) {
         ESP_LOGE(LOG_UART, "Failed to write UART data");
         return -1;
     }
-
     return bytes_written;
 }
 

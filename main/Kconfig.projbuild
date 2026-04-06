@@ -6,6 +6,30 @@ menu "NSController Configuration"
         help
             Enable detailed debug output for MCU operations.
 
+    choice TRANSPORT_LAYER_CHOICE
+        prompt "Transport Layer"
+        default TRANSPORT_LAYER_UART
+        help
+            Select the physical transport layer for controller communication.
+
+        config TRANSPORT_LAYER_UART
+            bool "UART (GPIO4/5, default)"
+            help
+                Use UART1 (GPIO4=RX, GPIO5=TX) for communication.
+
+        config TRANSPORT_LAYER_USB_SERIAL_JTAG
+            bool "USB Serial/JTAG (USB port)"
+            help
+                Use USB Serial/JTAG controller for communication.
+                Device will appear as /dev/ttyACM0 on Linux.
+                Note: Ensure console is set to UART0 when using this option.
+    endchoice
+
+    config TRANSPORT_LAYER
+        int
+        default 0 if TRANSPORT_LAYER_UART
+        default 1 if TRANSPORT_LAYER_USB_SERIAL_JTAG
+
     choice UART_PROTOCOL_CHOICE
         prompt "UART Protocol"
         default UART_PROTOCOL_SIMPLE
