@@ -138,7 +138,15 @@ int dev_uart_init(void) {
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    esp_err_t err = uart_param_config(UART_PORT_NUM, &uart_config);
+    esp_err_t err;
+    // Install UART driver
+    err = uart_driver_install(UART_PORT_NUM, UART_RX_BUFFER_SIZE, UART_TX_BUFFER_SIZE, 0, NULL, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE(LOG_UART, "Failed to install UART driver: %s", esp_err_to_name(err));
+        goto error;
+    }
+    
+    err = uart_param_config(UART_PORT_NUM, &uart_config);
     if (err != ESP_OK) {
         ESP_LOGE(LOG_UART, "Failed to configure UART parameters: %s", esp_err_to_name(err));
         goto error;
@@ -148,13 +156,6 @@ int dev_uart_init(void) {
     err = uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
         ESP_LOGE(LOG_UART, "Failed to set UART pins: %s", esp_err_to_name(err));
-        goto error;
-    }
-
-    // Install UART driver
-    err = uart_driver_install(UART_PORT_NUM, UART_RX_BUFFER_SIZE, UART_TX_BUFFER_SIZE, 0, NULL, 0);
-    if (err != ESP_OK) {
-        ESP_LOGE(LOG_UART, "Failed to install UART driver: %s", esp_err_to_name(err));
         goto error;
     }
 
