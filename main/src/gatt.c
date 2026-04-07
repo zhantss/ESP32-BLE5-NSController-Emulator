@@ -614,6 +614,7 @@ int gatt_notify(uint16_t conn_handle, uint16_t chr_val_handle,
         return BLE_HS_ENOMEM;
     }
 
+
     // send notification
     rc = ble_gatts_notify_custom(conn_handle, chr_val_handle, om);
     if (rc != 0) {
