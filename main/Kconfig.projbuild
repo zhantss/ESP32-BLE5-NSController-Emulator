@@ -60,4 +60,13 @@ menu "NSController Configuration"
         help
             GPIO number for UART TX pin. Default is GPIO5.
 
+    config HID_REPORT_INTERVAL
+        int "HID Report Interval (ms)"
+        default 15
+        range 5 100
+        help
+            Interval between HID report transmissions in milliseconds.
+            Lower values provide lower latency but require more CPU processing.
+            For ESP32-C61 (single-core), 20ms is recommended to avoid mbuf allocation failures.
+
 endmenu
