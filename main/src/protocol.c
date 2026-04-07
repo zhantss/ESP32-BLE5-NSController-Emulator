@@ -26,7 +26,9 @@ static const uint8_t flash_mem_013000[] = {
     // Body Color
     0x23, 0x23, 0x23,
     // Buttons Color
-    0xA0, 0xA0, 0xA0,
+    // 0xA0, 0xA0, 0xA0,
+    // ZA Color
+    0x63, 0xB9, 0X7A,
     // Highlight Color
     0xE6, 0xE6, 0xE6,
     // Grip Color
@@ -219,7 +221,7 @@ static uint8_t cmd_0x03_handler(const uint8_t subcmd, const uint16_t payload_len
     switch(subcmd) {
         case 0x07:
             #ifdef CONFIG_MCU_DEBUG
-                ESP_LOGI(LOG_APP, "0x03 0x07 cmd, ns2 send ltk");
+                ESP_LOGD(LOG_APP, "0x03 0x07 cmd, ns2 send ltk");
                 // head (8 bytes) | addr (4 bytes) | ltk (16 bytes)
                 log_print_ltk_hex("LTK", data_in + 8 + 6);
             #endif
@@ -393,13 +395,13 @@ static uint8_t cmd_0x15_handler(const uint8_t subcmd, const uint16_t payload_len
                 data_out[0] = 0x01;     // fixed
                 data_out[1] = 0x04;     // magic
                 data_out[2] = 0x01;     // size?
-                // 回复设备mac地址 小端
-                memcpy(data_out + 3, g_dev_ns2.ble_addr.val, ESP_BD_ADDR_LEN);
+                // response controller mac addr (little endian)
+                memcpy(data_out + 3, g_dev_controller.addr_re, ESP_BD_ADDR_LEN);
                 return ESP_BD_ADDR_LEN + 3;
             } else {
-                ESP_LOGI(LOG_APP, "remote NS2 address:");
+                ESP_LOGW(LOG_APP, "remote NS2 address:");
                 log_print_addr(mac_addr);
-                ESP_LOGI(LOG_APP, "local NS2 address:");
+                ESP_LOGW(LOG_APP, "local NS2 address:");
                 log_print_addr(g_dev_ns2.ble_addr.val);
                 ESP_LOGE(LOG_APP, "NS2 address mismatch");
             }

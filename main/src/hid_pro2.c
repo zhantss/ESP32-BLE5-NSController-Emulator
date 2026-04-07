@@ -69,7 +69,7 @@ static void pro2_report_init(hid_device_report_t *report) {
 
   pro2_hid_report_t *pro2_report = (pro2_hid_report_t *)report->report;
   pro2_report->counter = 0;
-  pro2_report->power_info = 0x42;
+  pro2_report->power_info = 0x20;
   pro2_report->unknown_0x0b = 0x38;
   pro2_report->unknown_0x0c = 0x00;
   pro2_report->headset_flag = 0x00;

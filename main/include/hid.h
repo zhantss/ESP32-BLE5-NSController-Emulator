@@ -13,7 +13,7 @@
 #define MEMORY_BARRIER() __sync_synchronize()
 
 // HID Report Interval(ms)
-#define HID_REPORT_INTERVAL     15
+#define HID_REPORT_INTERVAL     20
 typedef struct {
     dev_type_t type;
     void *report;

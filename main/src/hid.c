@@ -38,6 +38,7 @@ static void hid_task(void *arg) {
     const TickType_t xInterval = pdMS_TO_TICKS(HID_REPORT_INTERVAL);
 
     ESP_LOGI(LOG_HID, "hid report task start, interval: %dms", HID_REPORT_INTERVAL);
+    esp_log_level_set(LOG_HID, ESP_LOG_ERROR);
 
     while (1) {
         // check if notification is enabled
@@ -85,7 +86,7 @@ static void hid_task(void *arg) {
             int rc = gatt_notify(state->conn_handle, hid_report_gatt_handle,
                                     report_buffer, report_size);
             if (rc != 0) {
-                ESP_LOGW(LOG_HID, "hid report send failed, rc: %d", rc);
+                ESP_LOGE(LOG_HID, "hid report send failed, rc: %d", rc);
             }
         }
 
@@ -121,7 +122,7 @@ void hid_start_task(void) {
         goto error;
     }
 
-    BaseType_t rc = xTaskCreate(hid_task, "hid_task", 4096, NULL, 7, &hid_task_handle);
+    BaseType_t rc = xTaskCreate(hid_task, "hid_task", 4096, NULL, 4, &hid_task_handle);
     if (rc != pdPASS) {
         ESP_LOGE(LOG_HID, "create hid report task failed, rc: %d", rc);
         goto error;

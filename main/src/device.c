@@ -285,28 +285,28 @@ void subscribe_map_destroy() {
 int custom_store_config_read(int obj_type, const union ble_store_key *key, 
     union ble_store_value *value) {
   int ret =  ble_store_config_read(obj_type, key, value);
-  ESP_LOGI(LOG_APP, "custom_store_config_read, obj_type=%d", obj_type);
+  ESP_LOGD(LOG_APP, "custom_store_config_read, obj_type=%d", obj_type);
   if (ret != 0) {
     ESP_LOGE(LOG_APP, "sec read failed, reason=%02x", ret);
     log_print_addr(&key->sec.peer_addr.val);
   }
   switch(obj_type) {
     case BLE_STORE_OBJ_TYPE_OUR_SEC:
-      ESP_LOGI(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_OUR_SEC");
+      ESP_LOGD(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_OUR_SEC");
       log_print_addr(&key->sec.peer_addr.val);
       break;
     case BLE_STORE_OBJ_TYPE_PEER_SEC:
-      ESP_LOGI(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_PEER_SEC");
+      ESP_LOGD(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_PEER_SEC");
       log_print_addr(&key->sec.peer_addr.val);
       break;
     case BLE_STORE_OBJ_TYPE_CCCD:
-      ESP_LOGI(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_CCCD");
-      ESP_LOGI(LOG_APP, 
+      ESP_LOGD(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_CCCD");
+      ESP_LOGD(LOG_APP, 
         "custom_store_config_read, val_handle=0x%04x, idx=%d", 
         &key->cccd.chr_val_handle, &key->cccd.idx);
       break;
     case BLE_STORE_OBJ_TYPE_CSFC:
-      ESP_LOGI(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_CSFC");
+      ESP_LOGD(LOG_APP, "custom_store_config_read, BLE_STORE_OBJ_TYPE_CSFC");
       break;
     default:
       break;
@@ -315,19 +315,19 @@ int custom_store_config_read(int obj_type, const union ble_store_key *key,
 }
 
 int custom_store_config_write(int obj_type, const union ble_store_value *val) {
-  ESP_LOGI(LOG_APP, "custom_store_config_write, obj_type=%d", obj_type);
+  ESP_LOGD(LOG_APP, "custom_store_config_write, obj_type=%d", obj_type);
   switch(obj_type) {
     case BLE_STORE_OBJ_TYPE_OUR_SEC:
-      ESP_LOGI(LOG_APP, "custom_store_config_write, BLE_STORE_OBJ_TYPE_OUR_SEC");
+      ESP_LOGD(LOG_APP, "custom_store_config_write, BLE_STORE_OBJ_TYPE_OUR_SEC");
       log_print_addr(&val->sec.peer_addr.val);
       break;
     case BLE_STORE_OBJ_TYPE_PEER_SEC:
-      ESP_LOGI(LOG_APP, "custom_store_config_write, BLE_STORE_OBJ_TYPE_PEER_SEC");
+      ESP_LOGD(LOG_APP, "custom_store_config_write, BLE_STORE_OBJ_TYPE_PEER_SEC");
       log_print_addr(&val->sec.peer_addr.val);
       break;
     case BLE_STORE_OBJ_TYPE_CCCD:
-      ESP_LOGI(LOG_APP, "custom_store_config_write, BLE_STORE_OBJ_TYPE_CCCD");
-      ESP_LOGI(LOG_APP, 
+      ESP_LOGD(LOG_APP, "custom_store_config_write, BLE_STORE_OBJ_TYPE_CCCD");
+      ESP_LOGD(LOG_APP, 
         "custom_store_config_write, val_handle=0x%04x", 
         &val->cccd.chr_val_handle);
       break;
@@ -339,7 +339,7 @@ int custom_store_config_write(int obj_type, const union ble_store_value *val) {
 
 int custom_store_gen_key_cb(uint8_t key,struct ble_store_gen_key *gen_key, uint16_t conn_handle) {
   if (key == BLE_STORE_GEN_KEY_LTK && conn_handle == g_dev_ns2.conn_handle) {
-        ESP_LOGI(LOG_APP, "call custom_store_gen_key_cb LTK");
+        ESP_LOGD(LOG_APP, "call custom_store_gen_key_cb LTK");
         // Only intercept LTK generation and verify conn_handle ,wait testing
         // copy ltk to KEY generate callback function
         memcpy(g_dev_controller.ltk, gen_key->ltk_periph, LTK_KEY_SIZE);

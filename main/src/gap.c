@@ -79,7 +79,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       ESP_LOGI(LOG_BLE_GAP, "passkey action event; action=%d", event->passkey.params.action);
       return 0;
     case BLE_GAP_EVENT_NOTIFY_TX:
-      ESP_LOGI(LOG_BLE_GAP, "notify_tx event; conn_handle=%d attr_handle=%d "
+      ESP_LOGD(LOG_BLE_GAP, "notify_tx event; conn_handle=%d attr_handle=%d "
         "status=%d is_indication=%d",
         event->notify_tx.conn_handle,
         event->notify_tx.attr_handle,

@@ -90,13 +90,13 @@ static void uart_rx_task(void *arg) {
                     if (header_size == 0 && frame_pos == 0) {
                         in_frame = true;
                         frame_size = current_impl->get_frame_size(NULL, 0);
-                        ESP_LOGI(LOG_UART, "Frame started (no header), size: %d", frame_size);
+                        ESP_LOGD(LOG_UART, "Frame started (no header), size: %d", frame_size);
                         // Fall through to store current byte as first data byte
                     }
                     // Case 2: Collecting header bytes
                     else if (header_size > 0 && frame_pos < header_size) {
                         frame_buffer[frame_pos++] = byte;
-                        ESP_LOGI(LOG_UART, "Header byte[%d]: 0x%02X", frame_pos - 1, byte);
+                        ESP_LOGD(LOG_UART, "Header byte[%d]: 0x%02X", frame_pos - 1, byte);
                         continue;
                     }
                     // Case 3: Header complete - determine frame size and transition to in_frame
@@ -104,7 +104,7 @@ static void uart_rx_task(void *arg) {
                         frame_size = current_impl->get_frame_size(frame_buffer, frame_pos);
                         if (frame_size > 0) {
                             in_frame = true;
-                            ESP_LOGI(LOG_UART, "Frame started, size: %d", frame_size);
+                            ESP_LOGD(LOG_UART, "Frame started, size: %d", frame_size);
                             // Fall through to store current byte as first data byte
                         } else {
                             // Invalid header, shift and retry
@@ -119,17 +119,17 @@ static void uart_rx_task(void *arg) {
                 if (in_frame) {
                     if (frame_pos < frame_size) {
                         frame_buffer[frame_pos++] = byte;
-                        ESP_LOGI(LOG_UART, "Data byte[%d]: 0x%02X", frame_pos - 1, byte);
+                        ESP_LOGD(LOG_UART, "Data byte[%d]: 0x%02X", frame_pos - 1, byte);
                     }
 
                     // Check if frame is complete
                     if (frame_pos >= frame_size) {
-                        ESP_LOGI(LOG_UART, "Frame complete, size: %d", frame_size);
+                        ESP_LOGD(LOG_UART, "Frame complete, size: %d", frame_size);
                         dev_uart_event_t event;
                         dev_uart_event_type_t type = uart_protocol_parse_frame(current_impl, frame_buffer, frame_size, &event);
                         if (type != UART_EVENT_UNKNOWN) {
                             if (g_uart_manager.event_queue != NULL) {
-                                ESP_LOGI(LOG_UART, "Sending event to queue, type=%d", type);
+                                ESP_LOGD(LOG_UART, "Sending event to queue, type=%d", type);
                                 if (xQueueSend(g_uart_manager.event_queue, &event, 1) != pdTRUE) {
                                     ESP_LOGW(LOG_UART, "Event queue full, dropping event");
                                 }
@@ -205,8 +205,8 @@ int dev_uart_init(void) {
         goto error;
     }
 
-    ESP_LOGI(LOG_UART, "Transport: UART, port %d, baud %d", UART_PORT_NUM, UART_BAUD_RATE);
-    ESP_LOGI(LOG_UART, "RX pin: GPIO%d, TX pin: GPIO%d", UART_RX_PIN, UART_TX_PIN);
+    ESP_LOGD(LOG_UART, "Transport: UART, port %d, baud %d", UART_PORT_NUM, UART_BAUD_RATE);
+    ESP_LOGD(LOG_UART, "RX pin: GPIO%d, TX pin: GPIO%d", UART_RX_PIN, UART_TX_PIN);
 #endif
 
     // Set default protocol based on configuration
@@ -296,7 +296,7 @@ void dev_uart_deinit(void) {
 #endif
 
     g_uart_manager.initialized = false;
-    ESP_LOGI(LOG_UART, "Transport deinitialized");
+    ESP_LOGI(LOG_UART, "Transport deinitialize");
 }
 
 bool dev_uart_get_event(dev_uart_event_t* event) {
@@ -331,7 +331,7 @@ void dev_uart_process_events(void) {
                 ESP_LOGE(LOG_UART, "Failed to process event: %d", event.type);
                 return;
             } else if (rsp.len > 0) {
-                ESP_LOGI(LOG_UART, "Sending response: %d", rsp.len);
+                ESP_LOGD(LOG_UART, "Sending response: %d", rsp.len);
                 rc = dev_uart_send_data(rsp.data, rsp.len);
                 if (rc < 0) {
                     ESP_LOGE(LOG_UART, "Failed to send response: %d", event.type);

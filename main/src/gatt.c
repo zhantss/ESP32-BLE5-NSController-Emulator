@@ -209,7 +209,7 @@ static const ble_uuid128_t GATT_PRO2_CHARACTERISTIC_0x0032 = BLE_UUID128_INIT(
 
 static int gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
   struct ble_gatt_access_ctxt* ctxt, void* arg){
-    ESP_LOGI(LOG_APP, 
+    ESP_LOGD(LOG_APP, 
       "GATT service access callback, handle=%d, opcode=%d", attr_handle, ctxt->op);
     switch (ctxt->op) {
       case BLE_GATT_ACCESS_OP_READ_CHR:
@@ -225,7 +225,7 @@ static int gatt_svc_access(uint16_t conn_handle, uint16_t attr_handle,
 static int gatt_dsc_access(uint16_t conn_handle, uint16_t attr_handle,
   struct ble_gatt_access_ctxt* ctxt, void* arg) {
   uint8_t opcode = ctxt->op;
-    ESP_LOGI(LOG_APP, 
+    ESP_LOGD(LOG_APP, 
       "GATT dsc access callback, handle=%d, opcode=%d", attr_handle, ctxt->op);
   // TODO handle descriptor read/write
   if (opcode == BLE_GATT_ACCESS_OP_WRITE_DSC) {
@@ -279,15 +279,15 @@ static int gatt_svc_write_no_rsp_access(uint16_t conn_handle, uint16_t attr_hand
   struct ble_gatt_access_ctxt* ctxt, void* arg) {
   uint8_t opcode = ctxt->op;
   int rc;
-  ESP_LOGI(LOG_APP, "Write no rsp access callback, handle=0x00%02x, opcode=0x00%02x, mtu=%d", 
+  ESP_LOGD(LOG_APP, "Write no rsp access callback, handle=0x00%02x, opcode=0x00%02x, mtu=%d", 
     attr_handle, opcode, ble_att_mtu(conn_handle));
   if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
     if (attr_handle == gatt_svr_chr_0016_val_handle) {
       // 0x0016 handle no rsp
       uint16_t data_len = os_mbuf_len(ctxt->om);
-      ESP_LOGI(LOG_APP, "Received data length: %d", data_len);
+      ESP_LOGD(LOG_APP, "Received data length: %d", data_len);
       if (data_len < 8 + NS2_DATA_EMPTY_LEN) {
-        ESP_LOGI(LOG_APP, "Invalid data length: %d (expected >= 8)", data_len);
+        ESP_LOGE(LOG_APP, "Invalid data length: %d (expected >= 8)", data_len);
         return BLE_ATT_ERR_UNLIKELY;
       }
 
@@ -314,13 +314,13 @@ static int gatt_svc_write_no_rsp_access(uint16_t conn_handle, uint16_t attr_hand
       rsp->rsp_data = NULL;
       rsp->rsp_len = 0;
 
-      ESP_LOGI(LOG_APP, "Received data head: %02x%02x%02x%02x%02x%02x%02x%02x",
+      ESP_LOGD(LOG_APP, "Received data head: %02x%02x%02x%02x%02x%02x%02x%02x",
         data_buf[0], data_buf[1], data_buf[2], data_buf[3], data_buf[4], data_buf[5], data_buf[6], data_buf[7]);
       rsp->cmd = data_buf[0];
       rsp->subcmd = data_buf[3];
       rc = cmd_process(rsp, data_buf, data_len);
       if (rc != 0) {
-        ESP_LOGI(LOG_APP, "commands process failed: 0x%02x", rc);
+        ESP_LOGE(LOG_APP, "commands process failed: 0x%02x", rc);
       } else {
         // send notify use 0x001e
         rc = gatt_notify(conn_handle, gatt_svr_chr_001e_val_handle, rsp->rsp_data, rsp->rsp_len);
@@ -573,20 +573,20 @@ void device_gatt_svr_register_cb(struct ble_gatt_register_ctxt* ctxt, void* arg)
 
   switch (ctxt->op) {
     case BLE_GATT_REGISTER_OP_SVC:
-        ESP_LOGI(LOG_APP, "registered %-16s %s - %-10s = 0x00%02x", "service", 
+        ESP_LOGD(LOG_APP, "registered %-16s %s - %-10s = 0x00%02x", "service", 
         ble_uuid_to_str(ctxt->svc.svc_def->uuid, buf), 
         "handle", ctxt->svc.handle);
         break;
 
     case BLE_GATT_REGISTER_OP_CHR:
-        ESP_LOGI(LOG_APP, "registered %-16s %s - %-10s = 0x00%02x %-10s = 0x00%02x", "characteristic",
+        ESP_LOGD(LOG_APP, "registered %-16s %s - %-10s = 0x00%02x %-10s = 0x00%02x", "characteristic",
         ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf), 
         "def_handle", ctxt->chr.def_handle, 
         "val_handle", ctxt->chr.val_handle);
         break;
 
     case BLE_GATT_REGISTER_OP_DSC:
-        ESP_LOGI(LOG_APP, "registered %-16s %s - %-10s = 0x00%02x", "descriptor",
+        ESP_LOGD(LOG_APP, "registered %-16s %s - %-10s = 0x00%02x", "descriptor",
         ble_uuid_to_str(ctxt->dsc.dsc_def->uuid, buf),
         "handle", ctxt->dsc.handle);
         break;

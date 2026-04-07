@@ -108,7 +108,7 @@ void uart_protocol_set_debug(bool enable) {
     } else {
         ESP_LOGW(LOG_PROTOCOL, "Current protocol not set, unable to set debug");
     }
-    ESP_LOGI(LOG_PROTOCOL, "Protocol debug logging %s", enable ? "enabled" : "disabled");
+    ESP_LOGW(LOG_PROTOCOL, "Protocol debug logging %s", enable ? "enabled" : "disabled");
 }
 
 // Parse frame using current protocol
