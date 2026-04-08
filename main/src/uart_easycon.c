@@ -150,7 +150,16 @@ static dev_uart_event_type_t ec_parse_frame(const uint8_t* frame_data, size_t le
         event->data.ec_cmd_slice_data.cmd.code = ec_current_slice_event.code;
         event->data.ec_cmd_slice_data.cmd.index = ec_current_slice_event.index;
         event->data.ec_cmd_slice_data.cmd.len = ec_current_slice_event.len;
-        event->data.ec_cmd_slice_data.data = frame_data;
+        event->data.ec_cmd_slice_data.data = malloc(event->data.ec_cmd_slice_data.cmd.len);
+        if (event->data.ec_cmd_slice_data.data == NULL) {
+            // memory allocation failed
+            return UART_EVENT_ERROR;
+        }
+        // copy data from frame buffer
+        // !! NOT CAST POINTER
+        memcpy(event->data.ec_cmd_slice_data.data, 
+            frame_data, event->data.ec_cmd_slice_data.cmd.len);
+
         ec_current_slice_event.code = 0; // reset
         return UART_EVENT_EC_CMD_SLICE_DATA;
     }

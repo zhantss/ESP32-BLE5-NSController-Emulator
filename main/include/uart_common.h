@@ -96,7 +96,9 @@ typedef enum {
     UART_EVENT_EC_CMD_SLICE_DATA, // EasyCon command slice data
     UART_EVENT_EC_HID,            // EasyCon HID data (buttons + sticks)
     // Unknown
-    UART_EVENT_UNKNOWN
+    UART_EVENT_UNKNOWN,
+    // Error
+    UART_EVENT_ERROR,
 } dev_uart_event_type_t;
 
 // Complete UART event with type
