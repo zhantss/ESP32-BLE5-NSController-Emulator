@@ -25,17 +25,21 @@ extern "C" {
 // EasyCon command response code
 #define EASYCON_RPY_ERROR               0x0
 #define EASYCON_RPY_BUSY                0xFE
-#define EASYCON_RPY_ASK                 0xFF
+#define EASYCON_RPY_ACK                 0xFF
 #define EASYCON_RPY_HELLO               0x80
 #define EASYCON_RPY_FLASH_START         0x81
 #define EASYCON_RPY_FLASH_END           0x82
 #define EASYCON_RPY_SCRIPT_ACK          0x83
 
 // EasyCon protocol constants
-#define EASYCON_PROTOCOL_ENCODED_SIZE   8   // Encoded frame size (7-bit packed)
-#define EASYCON_PROTOCOL_RAW_SIZE       7   // Raw data size before encoding
-#define EASYCON_PROTOCOL_HELLO_SIZE     3   // hello and heartbeat frame size
-#define EASYCON_PROTOCOL_END_MARKER     0x80 // Last byte bit7=1 as end marker
+#define EASYCON_PROTOCOL_ENCODED_SIZE     8     // Encoded frame size (7-bit packed)
+#define EASYCON_PROTOCOL_RAW_SIZE         7     // Raw data size before encoding
+#define EASYCON_PROTOCOL_HELLO_SIZE       3     // hello and heartbeat frame size
+#define EASYCON_PROTOCOL_SHORT_CMD_SIZE   2     // Short command frame size
+#define EASYCON_PROTOCOL_SIMPLE_CMD_SIZE  3     // Simple command frame size
+#define EASYCON_PROTOCOL_SLICE_CMD_SIZE   6     // Slice command frame size
+#define EASYCON_PROTOCOL_END_MARKER       0x80  // Last byte bit7=1 as end marker
+#define EASYCON_PROTOCOL_SLICE_MAX_SIZE   20    // Max slice data size
 
 // HAT direction values
 #define HAT_CENTER        0x08
@@ -59,6 +63,8 @@ extern easycon_protocol_state_t ec_state;
 
 // EasyCon protocol implementation
 extern const uart_protocol_impl_t easycon_protocol_impl;
+
+extern ec_cmd_slice_event_t ec_current_slice_event;
 
 #ifdef __cplusplus
 }

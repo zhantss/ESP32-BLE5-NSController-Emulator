@@ -11,8 +11,12 @@
 #define LOG_EASYCON "easycon_protocol"
 
 easycon_protocol_state_t ec_state = EC_IDLE;
+ec_cmd_slice_event_t ec_current_slice_event = {0};
 
-static uint8_t hello_rsp[] = {EASYCON_RPY_HELLO};
+static uint8_t hello_rsp[] = { EASYCON_RPY_HELLO };
+static uint8_t mcu_version[] = { 0x77 };
+static uint8_t ack_rsp[] = { EASYCON_RPY_ACK };
+static uint8_t led_rsp[] = { 0x00 };
 
 const pro2_btns button_map[] = {
     // ID 0-7: 4 non-direction buttons in pro2_btn_bits_t byte 0
@@ -96,26 +100,43 @@ static uint16_t ec_scale_stick_value(uint8_t easycon_value) {
     return (uint16_t)easycon_value << 4;
 }
 
+static int ec_init() {
+    return 0;
+}
+
 static size_t ec_get_frame_header_size() {
-    // EASYCON_CMD_READY or others(hid no header)
-    // HELLO -> READY|READY|HELLO
-    // ScriptStart and others -> READY|_CMD
-    // TODO FLASH
     // Judge in get_frame_size
-    return 2;
+    return 3;
 }
 
 static size_t ec_get_frame_size(const uint8_t* header, size_t len) {
-    if (len != 2) return 0;
+    if (len != 3) return 0;
+    if (ec_current_slice_event.code != 0) {
+        // TODO flash color amiibo
+        return ec_current_slice_event.len;
+    }
     if (header[0] == EASYCON_CMD_READY) {
-        // CMD
+        // HELLO
         if (header[1] == EASYCON_CMD_READY) {
             // hello and heartbeat -> 3
             return EASYCON_PROTOCOL_HELLO_SIZE;
         }
-        // TODO FLASH
-        // others
-        return 2;
+        
+        if (header[2] == EASYCON_CMD_CHANGE_CONTROLLER_MODE 
+            || header[2] == EASYCON_CMD_CHANGE_AMIIBO_INDEX) {
+            return EASYCON_PROTOCOL_SIMPLE_CMD_SIZE;
+        }
+
+        if (header[1] == EASYCON_CMD_SCRIPT_START 
+            || header[1] == EASYCON_CMD_SCRIPT_STOP
+            || header[1] == EASYCON_CMD_VERSION
+            || header[1] == EASYCON_CMD_LED
+            || header[1] == EASYCON_CMD_UNPAIR) {
+            return EASYCON_PROTOCOL_SHORT_CMD_SIZE;
+        }
+        // flash color amiibo
+        // Ready | i & 0x7F | i >> 7 | len & 0x7F | len >> 7 | CMD_TAG
+        return EASYCON_PROTOCOL_SLICE_CMD_SIZE;
     } else {
         // HID
         // buttons(2) | hat(1) | sticks(4) | END_MARKER(1)
@@ -124,19 +145,67 @@ static size_t ec_get_frame_size(const uint8_t* header, size_t len) {
 }
 
 static dev_uart_event_type_t ec_parse_frame(const uint8_t* frame_data, size_t len, dev_uart_event_t* event) {
-    if (len == EASYCON_PROTOCOL_HELLO_SIZE) {
+    if (ec_current_slice_event.code != 0) {
+        event->type = UART_EVENT_EC_CMD_SLICE_DATA;
+        event->data.ec_cmd_slice_data.cmd.code = ec_current_slice_event.code;
+        event->data.ec_cmd_slice_data.cmd.index = ec_current_slice_event.index;
+        event->data.ec_cmd_slice_data.cmd.len = ec_current_slice_event.len;
+        event->data.ec_cmd_slice_data.data = frame_data;
+        ec_current_slice_event.code = 0; // reset
+        return UART_EVENT_EC_CMD_SLICE_DATA;
+    }
+
+    if (len == EASYCON_PROTOCOL_HELLO_SIZE || EASYCON_PROTOCOL_SIMPLE_CMD_SIZE) {
         event->type = UART_EVENT_EC_CMD;
-        event->data.ec_cmd.code = EASYCON_CMD_HELLO;
-        event->data.ec_cmd.data = 0;
+        if (frame_data[2] == EASYCON_CMD_HELLO) {
+            // hello
+            event->data.ec_cmd.code = EASYCON_CMD_HELLO;
+            event->data.ec_cmd.data = 0;
+        } else {
+            // simple command
+            switch(frame_data[2]) {
+                case EASYCON_CMD_CHANGE_CONTROLLER_MODE:
+                    event->data.ec_cmd.code = EASYCON_CMD_CHANGE_CONTROLLER_MODE;
+                    event->data.ec_cmd.data = frame_data[1];
+                    break;
+                case EASYCON_CMD_CHANGE_AMIIBO_INDEX:
+                    event->data.ec_cmd.code = EASYCON_CMD_CHANGE_AMIIBO_INDEX;
+                    event->data.ec_cmd.data = frame_data[1];
+                    break;
+                default:
+                    return UART_EVENT_UNKNOWN;
+            }
+        }
         return UART_EVENT_EC_CMD;
     }
-    if (len == EASYCON_PROTOCOL_HELLO_SIZE - 1) {
+
+    if (len == EASYCON_PROTOCOL_SHORT_CMD_SIZE) {
         event->type = UART_EVENT_EC_CMD;
-        // TODO check cmd code
         event->data.ec_cmd.code = frame_data[1];
         event->data.ec_cmd.data = 0;
         return UART_EVENT_EC_CMD;
     }
+
+    if (len == EASYCON_PROTOCOL_SLICE_CMD_SIZE) {
+        // flash color amiibo
+        event->data.ec_cmd_slice.index = (frame_data[1] & 0x7F) | frame_data[2];
+        event->data.ec_cmd_slice.len = (frame_data[3] & 0x7F) | frame_data[4];
+        switch(frame_data[EASYCON_PROTOCOL_SLICE_CMD_SIZE - 1]) {
+            case EASYCON_CMD_FLASH:
+                event->data.ec_cmd_slice.code = EASYCON_CMD_FLASH;
+                break;
+            case EASYCON_CMD_CHANGE_CONTROLLER_COLOR:
+                event->data.ec_cmd_slice.code = EASYCON_CMD_CHANGE_CONTROLLER_COLOR;
+                break;
+            case EASYCON_CMD_SAVE_AMIIBO:
+                event->data.ec_cmd_slice.code = EASYCON_CMD_SAVE_AMIIBO;
+                break;
+            default:
+                return UART_EVENT_UNKNOWN;
+        }
+        return UART_EVENT_EC_CMD_SLICE;
+    }
+
     if (len < EASYCON_PROTOCOL_ENCODED_SIZE 
         || (frame_data[len - 1] & EASYCON_PROTOCOL_END_MARKER) != 0) {
         return UART_EVENT_UNKNOWN;
@@ -220,13 +289,38 @@ static int ec_process_event(hid_device_report_t* buffer, dev_uart_event_t* event
             rsp->data = NULL;
             return 0;
         case UART_EVENT_EC_CMD:
-            if (event->data.ec_cmd.code == EASYCON_CMD_HELLO) {
-                ESP_LOGD(LOG_EASYCON, "Received Hello command");
-                rsp->len = 1;
-                rsp->data = hello_rsp;
-                return 0;
+            switch(event->data.ec_cmd.code) {
+                case EASYCON_CMD_HELLO:
+                    ESP_LOGD(LOG_EASYCON, "Received Hello command");
+                    rsp->len = 1;
+                    rsp->data = hello_rsp;
+                    return 0;
+                case EASYCON_CMD_VERSION:
+                    rsp->len = 1;
+                    rsp->data = mcu_version;
+                    return 0;
+                // TODO Device Logic
+                case EASYCON_CMD_LED:
+                    rsp->len = 1;
+                    rsp->data = led_rsp;
+                    return 0;
+                case EASYCON_CMD_UNPAIR:
+                case EASYCON_CMD_SCRIPT_START:
+                case EASYCON_CMD_SCRIPT_STOP:
+                case EASYCON_CMD_CHANGE_CONTROLLER_MODE:
+                case EASYCON_CMD_CHANGE_AMIIBO_INDEX:
+                    rsp->len = 1;
+                    rsp->data = ack_rsp;
+                    return 0;
+                default:
+                    return -1;
             }
-            // TODO implement other commands
+            return 0;
+        // TODO Slice CMD
+        case UART_EVENT_EC_CMD_SLICE:
+        case UART_EVENT_EC_CMD_SLICE_DATA:
+            rsp->len = 1;
+            rsp->data = ack_rsp;
             return 0;
         default:
             return -1;
@@ -240,6 +334,7 @@ static void ec_set_debug(bool enabled) {
 
 const uart_protocol_impl_t easycon_protocol_impl = {
     .protocol = UART_PROTOCOL_EASYCON,
+    .init = ec_init,
     .get_frame_header_size = ec_get_frame_header_size,
     .get_frame_size = ec_get_frame_size,
     .parse_frame = ec_parse_frame,

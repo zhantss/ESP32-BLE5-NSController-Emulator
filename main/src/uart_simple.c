@@ -33,6 +33,10 @@ static uint16_t simple_protocol_calculate_crc16(const uint8_t* data, size_t len)
     return crc;
 }
 
+static int simple_init() {
+    return 0;
+}
+
 static size_t simple_get_frame_header_size() {
     return 3;
 }
@@ -174,6 +178,7 @@ static void simple_set_debug(bool enabled) {
 
 const uart_protocol_impl_t simple_protocol_impl = {
     .protocol = UART_PROTOCOL_SIMPLE,
+    .init = simple_init,
     .get_frame_header_size = simple_get_frame_header_size,
     .get_frame_size = simple_get_frame_size,
     .parse_frame = simple_parse_frame,

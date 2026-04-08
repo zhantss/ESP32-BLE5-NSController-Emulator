@@ -52,6 +52,17 @@ typedef struct {
     uint8_t data;
 } ec_cmd_event_t;
 
+typedef struct {
+    uint8_t code;
+    uint16_t index;
+    uint16_t len;
+} ec_cmd_slice_event_t;
+
+typedef struct {
+    ec_cmd_slice_event_t cmd;
+    uint8_t *data;
+} ec_cmd_slice_data_event_t;
+
 // EasyCon protocol event
 typedef struct {
     uint16_t button_mask;    // Button bitmask (16 bits for non-direction, non-C buttons)
@@ -65,11 +76,13 @@ typedef struct {
 // Union for event data
 typedef union {
     // Simple Protocol
-    simple_management_event_t management;       // Management operation
-    simple_hid_event_t simple_hid;              // Simple HID event
+    simple_management_event_t management;           // Management operation
+    simple_hid_event_t simple_hid;                  // Simple HID event
     // EasyCon Protocol
-    ec_cmd_event_t ec_cmd;                      // EasyCon command
-    ec_hid_event_t ec_hid;                      // EasyCon HID Event
+    ec_cmd_event_t ec_cmd;                          // EasyCon command
+    ec_cmd_slice_event_t ec_cmd_slice;              // EasyCon command slice
+    ec_cmd_slice_data_event_t ec_cmd_slice_data;    // EasyCon command slice data
+    ec_hid_event_t ec_hid;                          // EasyCon HID Event
 } dev_uart_event_data_t;
 
 // UART event types
@@ -79,6 +92,8 @@ typedef enum {
     UART_EVENT_SIMPLE_HID,        // Simple HID data (buttons + sticks)
     // EasyCon
     UART_EVENT_EC_CMD,            // EasyCon command
+    UART_EVENT_EC_CMD_SLICE,      // EasyCon command slice
+    UART_EVENT_EC_CMD_SLICE_DATA, // EasyCon command slice data
     UART_EVENT_EC_HID,            // EasyCon HID data (buttons + sticks)
     // Unknown
     UART_EVENT_UNKNOWN
@@ -110,6 +125,7 @@ typedef enum {
  */
 typedef struct {
     uart_protocol_t protocol;
+    int (*init)(void);
     size_t (*get_frame_header_size)(void);
     size_t (*get_frame_size)(const uint8_t* header, size_t len);
     dev_uart_event_type_t (*parse_frame)(const uint8_t* frame_data, size_t len, dev_uart_event_t* event);

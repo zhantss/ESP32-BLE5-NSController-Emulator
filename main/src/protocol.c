@@ -26,9 +26,8 @@ static const uint8_t flash_mem_013000[] = {
     // Body Color
     0x23, 0x23, 0x23,
     // Buttons Color
-    // 0xA0, 0xA0, 0xA0,
-    // ZA Color
-    0x63, 0xB9, 0X7A,
+    // 0xA0, 0xA0, 0xA0,    // basic color
+    0x63, 0xB9, 0X7A,       // pokemon za green
     // Highlight Color
     0xE6, 0xE6, 0xE6,
     // Grip Color
