@@ -17,6 +17,7 @@ static uint8_t hello_rsp[] = { EASYCON_RPY_HELLO };
 static uint8_t mcu_version[] = { 0x77 };
 static uint8_t ack_rsp[] = { EASYCON_RPY_ACK };
 static uint8_t led_rsp[] = { 0x00 };
+static uint8_t script_rsp[] = { EASYCON_RPY_SCRIPT_ACK };
 
 const pro2_btns button_map[] = {
     // Map EasyCon button bits (0-13) to pro2_btns enum values
@@ -108,11 +109,11 @@ static int ec_init() {
 
 static size_t ec_get_frame_header_size() {
     // Judge in get_frame_size
-    return 3;
+    return 2;
 }
 
 static size_t ec_get_frame_size(const uint8_t* header, size_t len) {
-    if (len != 3) return 0;
+    if (len != 2) return 0;
     if (ec_current_slice_event.code != 0) {
         // TODO flash color amiibo
         return ec_current_slice_event.len;
@@ -124,10 +125,10 @@ static size_t ec_get_frame_size(const uint8_t* header, size_t len) {
             return EASYCON_PROTOCOL_HELLO_SIZE;
         }
         
-        if (header[2] == EASYCON_CMD_CHANGE_CONTROLLER_MODE 
-            || header[2] == EASYCON_CMD_CHANGE_AMIIBO_INDEX) {
-            return EASYCON_PROTOCOL_SIMPLE_CMD_SIZE;
-        }
+        // if (header[2] == EASYCON_CMD_CHANGE_CONTROLLER_MODE 
+        //     || header[2] == EASYCON_CMD_CHANGE_AMIIBO_INDEX) {
+        //     return EASYCON_PROTOCOL_SIMPLE_CMD_SIZE;
+        // }
 
         if (header[1] == EASYCON_CMD_SCRIPT_START 
             || header[1] == EASYCON_CMD_SCRIPT_STOP
@@ -261,7 +262,7 @@ static dev_uart_event_type_t ec_parse_frame(const uint8_t* frame_data, size_t le
     event->data.ec_hid.right_stick_x = right_stick_x;
     event->data.ec_hid.right_stick_y = right_stick_y;
 
-    ESP_LOGD(LOG_EASYCON, "HID event: buttons=0x%04X, hat=0x%02X, LX=0x%03X, LY=0x%03X, RX=0x%03X, RY=0x%03X",
+    ESP_LOGD(LOG_EASYCON, "HID event: buttons=0x%04X, hat=0x%02X, LX=%d, LY=%d, RX=%d, RY=%d",
              button_mask, hat_state, left_stick_x, left_stick_y, right_stick_x, right_stick_y);
     
 
@@ -307,35 +308,6 @@ static int ec_process_event(hid_device_report_t* buffer, dev_uart_event_t* event
             ops->set_left_stick(buffer, event->data.ec_hid.left_stick_x, event->data.ec_hid.left_stick_y);
             ops->set_right_stick(buffer, event->data.ec_hid.right_stick_x, event->data.ec_hid.right_stick_y);
 
-            // Print pressed buttons only
-            {
-                uint16_t mask = event->data.ec_hid.button_mask;
-                uint8_t hat = event->data.ec_hid.hat_state;
-                char pressed[128] = "";
-                int pos = 0;
-
-                const char* btn_names[] = {"Y", "B", "A", "X", "L", "R", "ZL", "ZR",
-                                           "MINUS", "PLUS", "L3", "R3", "HOME", "CAPTURE"};
-                for (int i = 0; i < 14; i++) {
-                    if (mask & (1 << i)) {
-                        pos += snprintf(pressed + pos, sizeof(pressed) - pos, "%s ", btn_names[i]);
-                    }
-                }
-
-                const char* hat_str[] = {"UP", "UP_RIGHT", "RIGHT", "DOWN_RIGHT",
-                                         "DOWN", "DOWN_LEFT", "LEFT", "UP_LEFT"};
-                if (hat < 8) {
-                    pos += snprintf(pressed + pos, sizeof(pressed) - pos, "%s ", hat_str[hat]);
-                }
-
-                if (pos > 0 || hat != 8) {
-                    ESP_LOGI(LOG_EASYCON, "Pressed: %s| LS(%d,%d) RS(%d,%d)",
-                             pressed,
-                             event->data.ec_hid.left_stick_x, event->data.ec_hid.left_stick_y,
-                             event->data.ec_hid.right_stick_x, event->data.ec_hid.right_stick_y);
-                }
-            }
-
             // no uart response
             rsp->len = 0;
             rsp->data = NULL;
@@ -357,12 +329,15 @@ static int ec_process_event(hid_device_report_t* buffer, dev_uart_event_t* event
                     rsp->data = led_rsp;
                     return 0;
                 case EASYCON_CMD_UNPAIR:
-                case EASYCON_CMD_SCRIPT_START:
-                case EASYCON_CMD_SCRIPT_STOP:
                 case EASYCON_CMD_CHANGE_CONTROLLER_MODE:
                 case EASYCON_CMD_CHANGE_AMIIBO_INDEX:
                     rsp->len = 1;
                     rsp->data = ack_rsp;
+                    return 0;
+                case EASYCON_CMD_SCRIPT_START:
+                case EASYCON_CMD_SCRIPT_STOP:
+                    rsp->len = 1;
+                    rsp->data = script_rsp;
                     return 0;
                 default:
                     return -1;

@@ -123,36 +123,33 @@ static int pro2_pairing_info_nvs_save() {
 static void pro2_global_ltk_sec_init() {
   if (g_ltk_sec == NULL) {
       g_ltk_sec = (struct ble_store_value_sec *)malloc(sizeof(struct ble_store_value_sec));
-      g_ltk_sec->bond_count = 1;
-      g_ltk_sec->key_size = LTK_KEY_SIZE;
-      // use little endian ltk
-      memcpy(g_ltk_sec->ltk, g_dev_controller.ltk_re, LTK_KEY_SIZE);
-      g_ltk_sec->ltk_present = 1;
-      g_ltk_sec->peer_addr.type = BLE_ADDR_PUBLIC;
-      // use little endian addr
-      memcpy(g_ltk_sec->peer_addr.val, g_dev_ns2.ble_addr.val, ESP_BD_ADDR_LEN);
-      // NS2 rand_num and ediv are both 0
-      g_ltk_sec->rand_num = 0;
-      g_ltk_sec->ediv = 0;
-      // g_ltk_sec->csrk_present = 0;
-      // g_ltk_sec->irk_present = 0;
-      g_ltk_sec->authenticated = 1;
-      g_ltk_sec->sc = 1;
+      if (g_ltk_sec == NULL) {
+          ESP_LOGE(LOG_APP, "malloc failed");
+          return;
+      }
   }
+  g_ltk_sec->bond_count = 1;
+  g_ltk_sec->key_size = LTK_KEY_SIZE;
+  // use little endian ltk
+  memcpy(g_ltk_sec->ltk, g_dev_controller.ltk_re, LTK_KEY_SIZE);
+  g_ltk_sec->ltk_present = 1;
+  g_ltk_sec->peer_addr.type = BLE_ADDR_PUBLIC;
+  // use little endian addr
+  memcpy(g_ltk_sec-> peer_addr.val, g_dev_ns2.ble_addr.val, ESP_BD_ADDR_LEN);
+  // NS2 rand_num and ediv are both 0
+  g_ltk_sec->rand_num = 0;
+  g_ltk_sec->ediv = 0;
+  // g_ltk_sec->csrk_present = 0;
+  // g_ltk_sec->irk_present = 0;
+  g_ltk_sec->authenticated = 1;
+  g_ltk_sec->sc = 1;
 }
 
-int pro2_pairing_info_save() {
+int pro2_inject_pairing_info_to_ble_context() {
   int rc = 0;
-  // TODO dev environment, do not save pairing info
-  // rc = pro2_pairing_info_nvs_save();
-  // if (rc != 0) {
-  //   return rc;
-  // }
   // init esp ble ltk sec
   pro2_global_ltk_sec_init();
-
   // write ltk to ble context
-
   rc = ble_store_write_our_sec(g_ltk_sec);
   if (rc != 0) {
       ESP_LOGE(LOG_APP, "ble_store_write_our_sec failed");
@@ -164,8 +161,12 @@ int pro2_pairing_info_save() {
       return rc;
   }
 
-  // TODO manual binding, execute initial binding logic
+  // manual binding, execute initial binding logic
   ble_gatts_bonding_established(g_dev_ns2.conn_handle);
 
   return rc;
+}
+
+int pro2_pairing_info_save() {
+  return pro2_pairing_info_nvs_save();
 }
