@@ -61,8 +61,10 @@ static esp_err_t pro2_ltk_init(nvs_handle_t nvs_handle) {
   esp_err_t ret;
   ret = nvs_get_blob(nvs_handle, NVS_KEY_LTK, g_dev_controller.ltk, &(size_t){LTK_KEY_SIZE});
   if (ret != ESP_OK) {
-    reverse_bytes(g_dev_controller.ltk, g_dev_controller.ltk_re, LTK_KEY_SIZE);
     ESP_LOGE(LOG_BLE_NVS, "Failed to get LTK from NVS");
+  } else {
+    reverse_bytes(g_dev_controller.ltk, g_dev_controller.ltk_re, LTK_KEY_SIZE);
+    ESP_LOGI(LOG_BLE_NVS, "LTK loaded and reversed successfully");
   }
   return ret;
 }
@@ -152,21 +154,28 @@ int pro2_inject_pairing_info_to_ble_context() {
   // write ltk to ble context
   rc = ble_store_write_our_sec(g_ltk_sec);
   if (rc != 0) {
-      ESP_LOGE(LOG_APP, "ble_store_write_our_sec failed");
+      ESP_LOGE(LOG_APP, "ble_store_write_our_sec failed, rc=%d", rc);
       return rc;
   }
+  ESP_LOGI(LOG_APP, "Injecting LTK for peer addr:");
+  log_print_addr(g_ltk_sec->peer_addr.val);
+
   rc = ble_store_write_peer_sec(g_ltk_sec);
   if (rc != 0) {
-      ESP_LOGE(LOG_APP, "ble_store_write_peer_sec failed");
+      ESP_LOGE(LOG_APP, "ble_store_write_peer_sec failed, rc=%d", rc);
       return rc;
   }
 
+  // TIP: Maybe not necessary to call this function
   // manual binding, execute initial binding logic
-  ble_gatts_bonding_established(g_dev_ns2.conn_handle);
+  // ble_gatts_bonding_established(g_dev_ns2.conn_handle);
 
   return rc;
 }
 
 int pro2_pairing_info_save() {
-  return pro2_pairing_info_nvs_save();
+  #ifdef CONFIG_SAVE_PAIRING_INFO
+    return pro2_pairing_info_nvs_save();
+  #endif
+  return 0;
 }

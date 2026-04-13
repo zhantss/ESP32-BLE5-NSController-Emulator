@@ -12,7 +12,6 @@
 // Log tags
 #define LOG_APP                 "app"
 #define LOG_HID                 "hid"
-#define LOG_BLE_LL              "ble_ll"
 #define LOG_BLE_GATT            "ble_gatt"
 #define LOG_BLE_GAP             "ble_gap"
 #define LOG_BLE_NVS             "ble_nvs"

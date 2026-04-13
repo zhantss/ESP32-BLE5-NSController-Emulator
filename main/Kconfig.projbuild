@@ -5,6 +5,12 @@ menu "NSController Configuration"
         default n
         help
             Enable detailed debug output for MCU operations.
+    
+    config SAVE_PAIRING_INFO
+        bool "Save pairing information"
+        default y
+        help
+            Save pairing information to flash memory for future use.
 
     choice TRANSPORT_LAYER_CHOICE
         prompt "Transport Layer"

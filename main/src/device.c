@@ -82,6 +82,17 @@ static void bleprph_on_sync(void) {
   ESP_ERROR_CHECK(ble_hs_util_ensure_addr(0));
   ESP_ERROR_CHECK(ble_hs_id_infer_auto(0, &own_addr_type));
   log_print_addr(g_dev_controller.addr_re);
+
+  // already paired, inject pairing info to BLE context
+  if (g_dev_controller.ltk[0] != 0) {
+    int rc = pro2_inject_pairing_info_to_ble_context();
+    if (rc != 0) {
+      ESP_LOGE(LOG_APP, "Failed to inject pairing info to BLE context");
+    } else {
+      ESP_LOGI(LOG_APP, "Pairing info injected to BLE context");
+    }
+  }
+
   ESP_ERROR_CHECK(
     ble_gap_set_prefered_default_le_phy(BLE_HCI_LE_PHY_2M_PREF_MASK, BLE_HCI_LE_PHY_2M_PREF_MASK)
   );
@@ -97,6 +108,19 @@ void host_task(void *param) {
 void ble_stack_init(void) {
     esp_err_t ret;
     nvs_init();
+
+    // BLE Security
+    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_NO_IO;
+    ble_hs_cfg.sm_oob_data_flag = 0;
+    ble_hs_cfg.sm_bonding = 1;            // Enable ESP-IDF Bonding Store Framework
+    // Disable Standard Bonding process
+    ble_hs_cfg.sm_mitm = 0;
+    ble_hs_cfg.sm_sc = 0;
+    ble_hs_cfg.sm_sc_only = 0;
+    ble_hs_cfg.sm_sec_lvl = 2;
+    ble_hs_cfg.sm_keypress = 0;
+    ble_hs_cfg.sm_our_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
+    ble_hs_cfg.sm_their_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
 
     ESP_LOGI(LOG_APP, "Device info init...");
     ret = device_info_init();
@@ -119,19 +143,6 @@ void ble_stack_init(void) {
       ESP_LOGE(LOG_APP, "ble_att_set_preferred_mtu() failed %d ", ret);
       return;
     }
-
-    // BLE Security
-    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_NO_IO;
-    ble_hs_cfg.sm_oob_data_flag = 0;
-    ble_hs_cfg.sm_bonding = 1;            // Enable ESP-IDF Bonding Store Framework
-    // Disable Standard Bonding process
-    ble_hs_cfg.sm_mitm = 0;
-    ble_hs_cfg.sm_sc = 0;
-    ble_hs_cfg.sm_sc_only = 0;
-    ble_hs_cfg.sm_sec_lvl = 2;
-    ble_hs_cfg.sm_keypress = 0;
-    ble_hs_cfg.sm_our_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
-    ble_hs_cfg.sm_their_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
 
     // BLE Callback
     ble_hs_cfg.reset_cb = bleprph_on_reset;
@@ -157,7 +168,66 @@ void ble_stack_init(void) {
 
 static uint8_t instance = 0;
 
+/**
+ * legacy advertising, not used
+ */
+#if 0
+static void ble_advertise_normal() {
+  int rc;
+  // reset device status
+  if (g_dev_controller.type == DEVICE_TYPE_JOYCON) {
+    // TODO Joycon
+    ESP_LOGE(LOG_APP, "Joycon not implemented");
+    return;
+  }
+  g_status = DEV_ADV_IND;
+
+  if (ble_gap_adv_active()) {
+    ESP_LOGI(LOG_APP, "Advertising instance already active");
+    return;
+  }
+  struct ble_gap_adv_params adv_params;
+  
+  memset(&adv_params, 0, sizeof(adv_params));
+  adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
+  adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
+  adv_params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
+  adv_params.itvl_max = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
+
+  // set manufacturer data
+  ESP_LOGI(LOG_APP, "Setting manufacturer data for advertising");
+  uint8_t m_head[3] = { 0x02, 0x01, 0x06 };
+  uint8_t m_size = sizeof(g_dev_controller.manufacturer_data) + 1; // 27
+  uint8_t m_spec[2] = { m_size, 0xFF };
+  uint8_t adv_data[sizeof(m_head) + sizeof(m_spec) + sizeof(g_dev_controller.manufacturer_data)];
+  memcpy(adv_data, m_head, sizeof(m_head));
+  memcpy(adv_data + sizeof(m_head), m_spec, sizeof(m_spec));
+  // TODO test wakeup flag
+  if (g_adv_opcode != 0x00) {
+    g_dev_controller.manufacturer_data[11] = g_adv_opcode;
+  }
+  memcpy(adv_data + sizeof(m_head) + sizeof(m_spec), 
+         g_dev_controller.manufacturer_data, 
+         sizeof(g_dev_controller.manufacturer_data));
+
+  rc = ble_gap_adv_set_data(adv_data, sizeof(adv_data));
+  if (rc != 0) {
+    ESP_LOGE(LOG_APP, "Error setting manufacturer data for advertising; rc=%d", rc);
+    return;
+  }
+
+  // start advertising
+  rc = ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER, &adv_params, handle_gap_event, NULL);
+  if (rc != 0) {
+    ESP_LOGE(LOG_APP, "Error enabling extended advertising; rc=%d", rc);
+    return;
+  }
+
+}
+#endif
+
 void ble_advertise() {
+  // ble_advertise_normal();
   int rc;
   // reset device status
   if (g_dev_controller.type == DEVICE_TYPE_JOYCON) {
