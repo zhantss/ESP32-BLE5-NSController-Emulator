@@ -1,6 +1,6 @@
 #include "device.h"
 #include "pro2.h"
-#include "protocol.h"
+#include "ns2_ble_gatt.h"
 #include "utils.h"
 
 // #region GATT UUID

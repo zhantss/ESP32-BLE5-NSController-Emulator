@@ -1,5 +1,5 @@
-#ifndef _PROTOCOL_H_
-#define _PROTOCOL_H_
+#ifndef _NS2_BLE_GATT_H_
+#define _NS2_BLE_GATT_H_
 
 /**
  * @brief Controller BLE Protocol
@@ -142,4 +142,4 @@ int read_memory(uint32_t addr, size_t read_len, uint8_t* out_buffer);
 
 /** @} */
 
-#endif // _PROTOCOL_H_
+#endif // _NS2_BLE_GATT_H_

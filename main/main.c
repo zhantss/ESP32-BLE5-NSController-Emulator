@@ -5,7 +5,7 @@
 #include "device.h"
 #include "hid.h"
 #include "uart.h"
-#include "protocol.h"
+#include "ns2_ble_gatt.h"
 
 void app_main(void)
 {
