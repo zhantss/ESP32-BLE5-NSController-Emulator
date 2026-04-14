@@ -454,7 +454,7 @@ static uint8_t cmd_0x15_handler(const uint8_t subcmd, const uint16_t payload_len
         case 0x03:
             // 00
             if (data_in[9] == 0x00) {
-                rc = pro2_pairing_info_save();
+                rc = controller_pairing_info_save();
                 rc += inject_pairing_info_to_ble_ctx();
 
                 if (rc == 0) {

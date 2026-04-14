@@ -47,18 +47,17 @@ static esp_err_t ns2_addr_init(nvs_handle_t nvs_handle) {
 static esp_err_t device_info_init() {
     nvs_handle_t nvs_handle;
     esp_err_t ret;
-    ret = nvs_open(NVS_NAME_PAIRING, NVS_READWRITE, &nvs_handle);
+    const char* pairing_ns = (g_controller_firmware.type == CONTROLLER_TYPE_PRO2) ? NVS_NAME_PAIRING_PRO2 : NVS_NAME_PAIRING_JC;
+    ret = nvs_open(pairing_ns, NVS_READWRITE, &nvs_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(LOG_BLE_NVS, "Failed to open NVS namespace: %s", NVS_NAME_PAIRING);
+        ESP_LOGE(LOG_BLE_NVS, "Failed to open NVS namespace: %s", pairing_ns);
         return ret;
     }
 
-    if (g_controller_firmware.type == CONTROLLER_TYPE_PRO2) {
-      ret = pro2_device_init(nvs_handle);
-      if (ret != ESP_OK) {
-        nvs_close(nvs_handle);
-        return ret;
-      }
+    ret = controller_init(nvs_handle);
+    if (ret != ESP_OK) {
+      nvs_close(nvs_handle);
+      return ret;
     }
 
     ret = ns2_addr_init(nvs_handle);

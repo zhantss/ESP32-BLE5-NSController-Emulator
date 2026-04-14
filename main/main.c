@@ -30,8 +30,11 @@ void app_main(void)
         ESP_LOGE(LOG_APP, "Failed to initialize transport, continuing without serial input");
     }
 
+    // Determine controller type from NVS
+    controller_type_init();
+
     // Initialize controller (HID)
-    if (g_controller.ops->init(&g_controller, g_controller_firmware.type) == 0) {
+    if (g_hid_controller.ops->init(&g_hid_controller, g_controller_firmware.type) == 0) {
         ESP_LOGI(LOG_APP, "Controller initialized");
     } else {
         ESP_LOGE(LOG_APP, "Failed to initialize controller");

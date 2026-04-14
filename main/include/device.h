@@ -19,8 +19,13 @@
 #define LOG_BLE_NVS             "ble_nvs"
 
 // NVS Key
-#define NVS_NAME_PAIRING        "PAIRING"
-#define NVS_KEY_DEVICE_ADDR     "DEVICE_MAC"
+#define NVS_NAME_CONFIG         "CONFIG"
+#define NVS_KEY_CONTROLLER_TYPE "CTRL_TYPE"
+
+#define NVS_NAME_PAIRING_PRO2   "PAIRING_PRO2"
+#define NVS_NAME_PAIRING_JC     "PAIRING_JC"
+
+#define NVS_KEY_CTRL_ADDR       "CTRL_MAC"
 #define NVS_KEY_HOST_ADDR       "HOST_MAC"
 #define NVS_KEY_LTK             "BLE_LTK"
 

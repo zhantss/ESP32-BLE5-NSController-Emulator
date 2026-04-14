@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "nvs_flash.h"
+
 #define ESP_BD_ADDR_LEN          6
 
 // LTK Length
@@ -32,5 +34,14 @@ typedef struct {
 extern controller_firmware_t g_controller_firmware;
 
 int inject_pairing_info_to_ble_ctx();
+
+// Read controller type from NVS (default PRO2)
+void controller_type_init(void);
+
+// Generic controller firmware init, dispatches to pro2/joycon
+int controller_init(nvs_handle_t nvs_handle);
+
+// Generic pairing info save, dispatches to pro2/joycon
+int controller_pairing_info_save(void);
 
 #endif // _CONTROLLER_CONTROLLER_H_

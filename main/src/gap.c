@@ -72,7 +72,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
         xTimerReset(s_restart_adv_timer, 0);
       }
       // stop hid task
-      g_controller.ops->stop_task(&g_controller);
+      g_hid_controller.ops->stop_task(&g_hid_controller);
       return 0;
     case BLE_GAP_EVENT_CONN_UPDATE:
       ESP_LOGI(LOG_BLE_GAP, "connection updated, conn_handle=%d, status=%d", 
@@ -122,7 +122,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       // 0x000e init hid report
       if (event->subscribe.attr_handle == 0x000e && event->subscribe.cur_notify == 1) {
         g_device_status = DEV_READY;
-        g_controller.ops->start_task(&g_controller);
+        g_hid_controller.ops->start_task(&g_hid_controller);
       }
       break;
     case BLE_GAP_EVENT_MTU:

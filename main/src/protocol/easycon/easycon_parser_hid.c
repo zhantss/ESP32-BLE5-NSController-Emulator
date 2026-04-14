@@ -90,8 +90,8 @@ static parse_result_t easycon_hid_parse_frame(void *state,
     uint16_t right_stick_x = ec_scale_stick_value(rx_raw);
     uint16_t right_stick_y = ec_scale_stick_value(255 - ry_raw);
 
-    const controller_hid_ops_t *ops = g_controller.hid_ops;
-    controller_hid_report_t *back_buffer = g_controller.ops->get_back_buffer(&g_controller);
+    const controller_hid_ops_t *ops = g_hid_controller.hid_ops;
+    controller_hid_report_t *back_buffer = g_hid_controller.ops->get_back_buffer(&g_hid_controller);
     if (ops && back_buffer) {
         for (size_t i = 0; i < BUTTON_MAP_SIZE; i++) {
             btns_pro2 btn = button_map[i];
@@ -130,7 +130,7 @@ static parse_result_t easycon_hid_parse_frame(void *state,
         /* TODO: After introducing HID bridge, replace direct back_buffer access
          * with bridge API or mark rsp as HID packet so the router can set
          * swap_request uniformly. Currently the caller must call
-         * g_controller.ops->request_swap(&g_controller) after protocol_route(). */
+         * g_hid_controller.ops->request_swap(&g_hid_controller) after protocol_route(). */
     }
 
     rsp->len = 0;

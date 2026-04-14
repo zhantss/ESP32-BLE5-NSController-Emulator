@@ -5,41 +5,16 @@
 #include "esp_mac.h"
 #include "esp_random.h"
 
-controller_firmware_t g_controller_firmware = {
-    // 78:81:8c -> Nintendo (Area HK)
-    .addr = { 0x78, 0x81, 0x8c, 0x00, 0x00, 0x00 },
-    // not initialized
-    .addr_re = { 0 },
-    .ltk = { 0 },
-    .ltk_re = { 0 },
-    .ltk_key_b1 = {
-        0x5C, 0xF6, 0xEE, 0x79, 0x2C, 0xDF, 0x05, 0xE1,
-        0xBA, 0x2B, 0x63, 0x25, 0xC4, 0x1A, 0x5F, 0x10
-    },
-    .type = CONTROLLER_TYPE_PRO2,
-    .manufacturer_data = {
-        0x53, 0x05,                                 // Manufacturer ID, Nintendo
-        0x01, 0x00, 0x03,                           // fixed, Maybe Version
-        0x7E, 0x05,                                 // Vendor Id, Nintendo
-        0x69, 0x20,                                 // Product ID, Pro2
-        0x00, 0x01,                                 // fixed, Maybe Placeholder
-        0x00,                                       // 0x81 -> wake adv, 0x00 otherwise
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,         // ns2 address, little endian
-        0x0F,                                       // fixed
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00    // placeholder
-    }
-};
-
 static esp_err_t pro2_addr_init(nvs_handle_t nvs_handle) {
     esp_err_t ret;
-    ret = nvs_get_blob(nvs_handle, NVS_KEY_DEVICE_ADDR, g_controller_firmware.addr_re, &(size_t){ESP_BD_ADDR_LEN});
+    ret = nvs_get_blob(nvs_handle, NVS_KEY_CTRL_ADDR, g_controller_firmware.addr_re, &(size_t){ESP_BD_ADDR_LEN});
     if (ret != ESP_OK) {
         ESP_LOGW(LOG_BLE_NVS, "Failed to get Pro2 addr from NVS, will be generated...");
         esp_fill_random(g_controller_firmware.addr + 3, 3);
         
         // save pro2 addr to nvs
         reverse_bytes(g_controller_firmware.addr, g_controller_firmware.addr_re, ESP_BD_ADDR_LEN);
-        ret = nvs_set_blob(nvs_handle, NVS_KEY_DEVICE_ADDR, g_controller_firmware.addr_re, ESP_BD_ADDR_LEN);
+        ret = nvs_set_blob(nvs_handle, NVS_KEY_CTRL_ADDR, g_controller_firmware.addr_re, ESP_BD_ADDR_LEN);
         if (ret != ESP_OK) {
           ESP_LOGE(LOG_BLE_NVS, "Failed to save Pro2 addr to NVS");
           return ret;
@@ -93,9 +68,10 @@ int pro2_device_init(nvs_handle_t nvs_handle) {
 static int pro2_pairing_info_nvs_save() {
   nvs_handle_t nvs_handle;
   esp_err_t ret;
-  ret = nvs_open(NVS_NAME_PAIRING, NVS_READWRITE, &nvs_handle);
+  const char* pairing_ns = (g_controller_firmware.type == CONTROLLER_TYPE_PRO2) ? NVS_NAME_PAIRING_PRO2 : NVS_NAME_PAIRING_JC;
+  ret = nvs_open(pairing_ns, NVS_READWRITE, &nvs_handle);
   if (ret != ESP_OK) {
-    ESP_LOGE(LOG_BLE_NVS, "Failed to open NVS namespace: %s", NVS_NAME_PAIRING);
+    ESP_LOGE(LOG_BLE_NVS, "Failed to open NVS namespace: %s", pairing_ns);
     nvs_close(nvs_handle);
     return ret;
   }

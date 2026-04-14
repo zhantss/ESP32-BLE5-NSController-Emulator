@@ -58,7 +58,7 @@ static void transport_protocol_task(void *arg)
         parse_result_t result = protocol_route(g_protocol_inst, &g_transport_rx_ringbuf, &rsp);
 
         if (result == PARSE_OK) {
-            g_controller.ops->request_swap(&g_controller);
+            g_hid_controller.ops->request_swap(&g_hid_controller);
 
             if (rsp.len > 0 && g_transport.ops->submit_tx != NULL) {
                 g_transport.ops->submit_tx(&g_transport, rsp.data, rsp.len);

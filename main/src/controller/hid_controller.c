@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 // Global controller instance
-controller_handle_t g_controller = {
+controller_handle_t g_hid_controller = {
     .ops = &controller_ops,
     .hid_ops = NULL,
     .type = CONTROLLER_TYPE_PRO2,       // default pro2

@@ -71,7 +71,7 @@ struct controller_handle {
 };
 
 // Global controller instance
-extern controller_handle_t g_controller;
+extern controller_handle_t g_hid_controller;
 
 // Global controller operations
 extern const controller_ops_t controller_ops;
