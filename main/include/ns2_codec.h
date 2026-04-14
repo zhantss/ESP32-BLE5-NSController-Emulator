@@ -125,8 +125,19 @@ typedef struct {
 } mem_sim_t;
 
 /**
+ * @brief Set device info into the simulated 0x013000 flash memory block.
+ */
+void set_controller_specific(uint16_t product_id,
+                               const uint8_t *serial, size_t serial_len,
+                               const uint8_t version[3],
+                               const uint8_t body_color[3],
+                               const uint8_t buttons_color[3],
+                               const uint8_t highlight_color[3],
+                               const uint8_t grip_color[3]);
+
+/**
  * @brief Simulated Memory Reading Function
- * 
+ *
  * @param addr memory address
  * @param read_len reading data length
  * @param out_buffer reading data buffer

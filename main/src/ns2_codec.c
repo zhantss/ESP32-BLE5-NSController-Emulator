@@ -13,7 +13,7 @@
  */
 
 // Device Info
-static const uint8_t flash_mem_013000[] = {
+static uint8_t flash_mem_013000[] = {
     // start flag
     0x01, 0x00,
     // serial number, HEJ71001123456
@@ -114,6 +114,42 @@ static const mem_sim_t flash_mem_list[] = {
 };
 
 static const size_t flash_mem_list_len = sizeof(flash_mem_list) / sizeof(mem_sim_t);
+
+void set_controller_specific(uint16_t product_id,
+                               const uint8_t *serial, size_t serial_len,
+                               const uint8_t version[3],
+                               const uint8_t body_color[3],
+                               const uint8_t buttons_color[3],
+                               const uint8_t highlight_color[3],
+                               const uint8_t grip_color[3]) {
+    // start flag
+    flash_mem_013000[0] = 0x01;
+    flash_mem_013000[1] = 0x00;
+
+    // serial number (16 bytes, null-padded)
+    memset(&flash_mem_013000[2], 0, 16);
+    if (serial != NULL && serial_len > 0) {
+        size_t copy_len = serial_len > 16 ? 16 : serial_len;
+        memcpy(&flash_mem_013000[2], serial, copy_len);
+    }
+
+    // Vendor ID, Nintendo
+    flash_mem_013000[18] = 0x7E;
+    flash_mem_013000[19] = 0x05;
+
+    // Product ID (little-endian)
+    flash_mem_013000[20] = product_id & 0xFF;
+    flash_mem_013000[21] = (product_id >> 8) & 0xFF;
+
+    // Version/Edition
+    memcpy(&flash_mem_013000[22], version, 3);
+
+    // Colors
+    memcpy(&flash_mem_013000[25], body_color, 3);
+    memcpy(&flash_mem_013000[28], buttons_color, 3);
+    memcpy(&flash_mem_013000[31], highlight_color, 3);
+    memcpy(&flash_mem_013000[34], grip_color, 3);
+}
 
 int read_memory(uint32_t addr, size_t read_len, uint8_t* out_buffer) {
     if (read_len == 0 || out_buffer == NULL) {

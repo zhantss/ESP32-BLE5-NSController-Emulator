@@ -1,6 +1,7 @@
 #include "device.h"
 #include "pro2.h"
 #include "utils.h"
+#include "ns2_codec.h"
 
 #include "esp_mac.h"
 #include "esp_random.h"
@@ -62,6 +63,24 @@ int pro2_device_init(nvs_handle_t nvs_handle) {
         ESP_LOGI(LOG_APP, "device already paired.");
         log_print_ltk_hex("LTK", g_controller_firmware.ltk);
     }
+
+    const uint8_t version[3] = {0x01, 0x06, 0x01};
+    const uint8_t body_color[3] = {0x23, 0x23, 0x23};
+    const uint8_t buttons_color[3] = {0x63, 0xB9, 0x7A};        // pokemon za green
+    const uint8_t highlight_color[3] = {0xE6, 0xE6, 0xE6};
+    const uint8_t grip_color[3] = {0x32, 0x32, 0x32};
+    set_controller_specific(
+        0x2069,
+        (const uint8_t *)"HEJ71001123456", 14,
+        version,
+        body_color,
+        buttons_color,
+        highlight_color,
+        grip_color
+    );
+    g_controller_firmware.manufacturer_data[6] = 0x69;
+    g_controller_firmware.manufacturer_data[7] = 0x20;
+
     return ret;
 }
 
