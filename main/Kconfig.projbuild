@@ -54,6 +54,24 @@ menu "NSController Configuration"
         default 0 if UART_PROTOCOL_SIMPLE
         default 1 if UART_PROTOCOL_EASYCON
 
+    choice PROTOCOL_LAYER_CHOICE
+        prompt "Protocol Layer"
+        default PROTOCOL_LAYER_SIMPLE
+        help
+            Select the protocol layer implementation for the transport layer.
+
+        config PROTOCOL_LAYER_SIMPLE
+            bool "Simple protocol layer (default)"
+
+        config PROTOCOL_LAYER_EASYCON
+            bool "EasyCon protocol layer"
+    endchoice
+
+    config PROTOCOL_LAYER
+        int
+        default 0 if PROTOCOL_LAYER_SIMPLE
+        default 1 if PROTOCOL_LAYER_EASYCON
+
     config UART_RX_PIN
         int "UART RX Pin (GPIO)"
         default 4
