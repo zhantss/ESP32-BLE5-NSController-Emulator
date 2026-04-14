@@ -36,24 +36,6 @@ menu "NSController Configuration"
         default 0 if TRANSPORT_LAYER_UART
         default 1 if TRANSPORT_LAYER_USB_SERIAL_JTAG
 
-    choice UART_PROTOCOL_CHOICE
-        prompt "UART Protocol"
-        default UART_PROTOCOL_SIMPLE
-        help
-            Select the UART communication protocol.
-
-        config UART_PROTOCOL_SIMPLE
-            bool "Simple protocol (default)"
-
-        config UART_PROTOCOL_EASYCON
-            bool "EasyCon protocol"
-    endchoice
-
-    config UART_PROTOCOL
-        int
-        default 0 if UART_PROTOCOL_SIMPLE
-        default 1 if UART_PROTOCOL_EASYCON
-
     choice PROTOCOL_LAYER_CHOICE
         prompt "Protocol Layer"
         default PROTOCOL_LAYER_SIMPLE
