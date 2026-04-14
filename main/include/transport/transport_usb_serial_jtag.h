@@ -1,7 +1,7 @@
 #ifndef TRANSPORT_USB_SERIAL_JTAG_H
 #define TRANSPORT_USB_SERIAL_JTAG_H
 
-#include "transport.h"
+#include "transport/transport.h"
 
 #include <stdint.h>
 #include <stdbool.h>

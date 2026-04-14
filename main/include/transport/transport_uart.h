@@ -1,7 +1,7 @@
 #ifndef TRANSPORT_UART_H
 #define TRANSPORT_UART_H
 
-#include "transport.h"
+#include "transport/transport.h"
 
 #include <stdint.h>
 #include <stdbool.h>

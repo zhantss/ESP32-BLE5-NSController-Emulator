@@ -1,4 +1,4 @@
-#include "protocol.h"
+#include "protocol/protocol.h"
 
 parse_result_t protocol_route(protocol_instance_t *inst,
                                      zc_ringbuf_t *rb,

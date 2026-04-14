@@ -1,7 +1,7 @@
 #ifndef EASYCON_INSTANCE_H
 #define EASYCON_INSTANCE_H
 
-#include "protocol.h"
+#include "protocol/protocol.h"
 
 #ifdef __cplusplus
 extern "C" {

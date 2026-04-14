@@ -1,7 +1,7 @@
 #ifndef TRANSPORT_H
 #define TRANSPORT_H
 
-#include "zc_buffer.h"
+#include "buffer/zc_buffer.h"
 
 #include <stdint.h>
 #include <stdbool.h>

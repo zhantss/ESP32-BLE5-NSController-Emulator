@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "zc_buffer.h"
+#include "buffer/zc_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {

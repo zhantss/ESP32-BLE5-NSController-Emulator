@@ -2,7 +2,7 @@
 
 #ifdef CONFIG_PROTOCOL_LAYER_EASYCON
 
-#include "zc_buffer.h"
+#include "buffer/zc_buffer.h"
 #include "hid.h"
 #include "hid_pro2.h"
 #include "device.h"

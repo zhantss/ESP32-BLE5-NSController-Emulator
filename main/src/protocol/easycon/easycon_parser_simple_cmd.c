@@ -2,7 +2,7 @@
 
 #ifdef CONFIG_PROTOCOL_LAYER_EASYCON
 
-#include "zc_buffer.h"
+#include "buffer/zc_buffer.h"
 #include "utils.h"
 
 #include <stdint.h>

@@ -1,7 +1,7 @@
 #ifndef EASYCON_PROTOCOL_H
 #define EASYCON_PROTOCOL_H
 
-#include "protocol.h"
+#include "protocol/protocol.h"
 
 #include <stdint.h>
 

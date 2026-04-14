@@ -1,4 +1,4 @@
-#include "transport_usb_serial_jtag.h"
+#include "transport/transport_usb_serial_jtag.h"
 
 #include <string.h>
 #include <stdlib.h>
