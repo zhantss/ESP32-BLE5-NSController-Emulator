@@ -31,4 +31,6 @@ typedef struct {
 
 extern controller_firmware_t g_controller_firmware;
 
+int inject_pairing_info_to_ble_ctx();
+
 #endif // _CONTROLLER_CONTROLLER_H_

@@ -2,6 +2,15 @@
 #include "controller/hid_controller.h"
 #include "utils.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+
+static TimerHandle_t s_restart_adv_timer = NULL;
+
+static void restart_adv_timer_cb(TimerHandle_t xTimer) {
+  ble_advertise();
+}
+
 static void print_conn_desc(struct ble_gap_conn_desc* desc) {
   ESP_LOGI(LOG_BLE_GAP, "handle=%d our_ota_addr_type=%d our_ota_addr=", 
     desc->conn_handle, desc->our_ota_addr.type);
@@ -43,6 +52,10 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
           ESP_LOGE(LOG_BLE_GAP, "device not ready, reset device");
           g_device_status = DEV_BOOT;
         }
+        // cancel pending restart advertising timer
+        if (s_restart_adv_timer != NULL) {
+          xTimerStop(s_restart_adv_timer, 0);
+        }
       } else {
         // failed, restart advertising
         ESP_LOGE(LOG_BLE_GAP, "connection failed, status=%d, restart advertising",
@@ -51,9 +64,13 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       }
       return 0;
     case BLE_GAP_EVENT_DISCONNECT:
-      ESP_LOGI(LOG_BLE_GAP, "disconnected, reason=%d, restart advertising", event->disconnect.reason);
-      // TODO dev env not restart adv
-      // ble_advertise();
+      ESP_LOGI(LOG_BLE_GAP, "disconnected, reason=%d, restart advertising after 30s", event->disconnect.reason);
+      if (s_restart_adv_timer == NULL) {
+        s_restart_adv_timer = xTimerCreate("restart_adv", pdMS_TO_TICKS(30000), pdFALSE, NULL, restart_adv_timer_cb);
+      }
+      if (s_restart_adv_timer != NULL) {
+        xTimerReset(s_restart_adv_timer, 0);
+      }
       // stop hid task
       g_controller.ops->stop_task(&g_controller);
       return 0;

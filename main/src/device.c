@@ -1,6 +1,7 @@
 #include "device.h"
 #include "pro2.h"
 #include "utils.h"
+#include "controller/controller.h"
 
 #include "esp_mac.h"
 #include "esp_err.h"
@@ -85,7 +86,7 @@ static void bleprph_on_sync(void) {
 
   // already paired, inject pairing info to BLE context
   if (g_controller_firmware.ltk[0] != 0) {
-    int rc = pro2_inject_pairing_info_to_ble_context();
+    int rc = inject_pairing_info_to_ble_ctx();
     if (rc != 0) {
       ESP_LOGE(LOG_APP, "Failed to inject pairing info to BLE context");
     } else {

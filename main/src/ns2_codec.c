@@ -1,6 +1,7 @@
 #include "device.h"
 #include "pro2.h"
 #include "ns2_codec.h"
+#include "controller/controller.h"
 #include "controller/hid_controller_pro2.h"
 #include "utils.h"
 
@@ -454,7 +455,7 @@ static uint8_t cmd_0x15_handler(const uint8_t subcmd, const uint16_t payload_len
             // 00
             if (data_in[9] == 0x00) {
                 rc = pro2_pairing_info_save();
-                rc += pro2_inject_pairing_info_to_ble_context();
+                rc += inject_pairing_info_to_ble_ctx();
 
                 if (rc == 0) {
                     data_out[0] = 0x01;
@@ -478,10 +479,11 @@ static uint8_t cmd_0x16_handler(const uint8_t subcmd, const uint16_t payload_len
         // len 0x18 all 0x00
         uint8_t res_data[0x18] = { 0x00 };
         memcpy(data_out, res_data, 0x18);
-        if (g_adv_opcode == 0x81) {
-            // TODO IF Already paired, save ltk_sec to ble context
-            pro2_inject_pairing_info_to_ble_context();
-        }
+        // TODO Test
+        // if (g_adv_opcode == 0x81) {
+        //     // IF Already paired, save ltk_sec to ble context
+        //     inject_pairing_info_to_ble_ctx();
+        // }
         return 0x18;
     }
     return 0x00;
