@@ -107,6 +107,9 @@ typedef struct {
     protocol_parser_t *parsers[MAX_PROTOCOL_PARSERS];
 } protocol_instance_t;
 
+/* TODO: Add a compile-time or run-time assertion in the protocol-layer
+ *       integration code to ensure parser_count <= MAX_PROTOCOL_PARSERS. */
+
 /**
  * @brief Route incoming data to the first matching parser.
  *
