@@ -3,8 +3,8 @@
 #include "nvs_flash.h"
 
 #include "device.h"
-#include "hid.h"
-#include "uart.h"
+#include "controller/hid_controller.h"
+#include "transport/transport.h"
 #include "ns2_ble_gatt.h"
 
 void app_main(void)
@@ -18,18 +18,23 @@ void app_main(void)
     ESP_LOGI(LOG_APP, "Nintendo Switch Controller Emulator");
     ESP_LOGI(LOG_APP, "Starting initialization...");
 
-    // Initialize UART for external input
-    int uart_ret = dev_uart_init();
-    if (uart_ret != 0) {
-        ESP_LOGE(LOG_APP, "Failed to initialize UART, continuing without serial input");
-    } else {
-        ESP_LOGI(LOG_APP, "UART initialized successfully");
-        // Start UART RX task
-        if (dev_uart_start_task() == 0) {
-            ESP_LOGI(LOG_APP, "UART RX task started");
+    // Initialize transport layer
+    if (transport_init() == 0) {
+        ESP_LOGI(LOG_APP, "Transport initialized successfully");
+        if (transport_start() == 0) {
+            ESP_LOGI(LOG_APP, "Transport protocol task started");
         } else {
-            ESP_LOGE(LOG_APP, "Failed to start UART RX task");
+            ESP_LOGE(LOG_APP, "Failed to start transport protocol task");
         }
+    } else {
+        ESP_LOGE(LOG_APP, "Failed to initialize transport, continuing without serial input");
+    }
+
+    // Initialize controller (HID)
+    if (g_controller.ops->init(&g_controller, g_controller_firmware.type) == 0) {
+        ESP_LOGI(LOG_APP, "Controller initialized");
+    } else {
+        ESP_LOGE(LOG_APP, "Failed to initialize controller");
     }
 
     // Initialize BLE stack

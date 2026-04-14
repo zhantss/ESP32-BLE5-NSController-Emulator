@@ -1,5 +1,5 @@
 #include "device.h"
-#include "hid.h"
+#include "controller/hid_controller.h"
 #include "utils.h"
 
 static void print_conn_desc(struct ble_gap_conn_desc* desc) {
@@ -55,7 +55,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       // TODO dev env not restart adv
       // ble_advertise();
       // stop hid task
-      hid_stop_task();
+      g_controller.ops->stop_task(&g_controller);
       return 0;
     case BLE_GAP_EVENT_CONN_UPDATE:
       ESP_LOGI(LOG_BLE_GAP, "connection updated, conn_handle=%d, status=%d", 
@@ -105,7 +105,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       // 0x000e init hid report
       if (event->subscribe.attr_handle == 0x000e && event->subscribe.cur_notify == 1) {
         g_device_status = DEV_READY;
-        hid_start_task();
+        g_controller.ops->start_task(&g_controller);
       }
       break;
     case BLE_GAP_EVENT_MTU:

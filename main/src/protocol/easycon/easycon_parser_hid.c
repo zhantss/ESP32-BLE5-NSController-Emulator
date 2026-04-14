@@ -3,8 +3,8 @@
 #ifdef CONFIG_PROTOCOL_LAYER_EASYCON
 
 #include "buffer/zc_buffer.h"
-#include "hid.h"
-#include "hid_pro2.h"
+#include "controller/hid_controller.h"
+#include "controller/hid_controller_pro2.h"
 #include "device.h"
 #include "utils.h"
 
@@ -53,7 +53,7 @@ static uint16_t ec_scale_stick_value(uint8_t easycon_value)
     return (uint16_t)easycon_value << 4;
 }
 
-static const pro2_btns button_map[] = {
+static const btns_pro2 button_map[] = {
     Y, B, A, X, L, R, ZL, ZR, Minus, Plus, LClick, RClick, Home, Capture
 };
 static const size_t BUTTON_MAP_SIZE = 14;
@@ -90,12 +90,13 @@ static parse_result_t easycon_hid_parse_frame(void *state,
     uint16_t right_stick_x = ec_scale_stick_value(rx_raw);
     uint16_t right_stick_y = ec_scale_stick_value(255 - ry_raw);
 
-    const hid_device_ops_t *ops = hid_get_device_ops(g_controller_firmware.type);
-    if (ops) {
+    const controller_hid_ops_t *ops = g_controller.hid_ops;
+    controller_hid_report_t *back_buffer = g_controller.ops->get_back_buffer(&g_controller);
+    if (ops && back_buffer) {
         for (size_t i = 0; i < BUTTON_MAP_SIZE; i++) {
-            pro2_btns btn = button_map[i];
+            btns_pro2 btn = button_map[i];
             bool pressed = (button_mask & (1U << i)) != 0;
-            ops->set_button(g_hid_double_buffer.back_buffer, btn, pressed);
+            ops->set_button(back_buffer, btn, pressed);
         }
 
         uint8_t direction = hat_state & 0x0FU;
@@ -118,18 +119,18 @@ static parse_result_t easycon_hid_parse_frame(void *state,
                 break;
         }
 
-        ops->set_button(g_hid_double_buffer.back_buffer, Up,    up_pressed);
-        ops->set_button(g_hid_double_buffer.back_buffer, Down,  down_pressed);
-        ops->set_button(g_hid_double_buffer.back_buffer, Left,  left_pressed);
-        ops->set_button(g_hid_double_buffer.back_buffer, Right, right_pressed);
+        ops->set_button(back_buffer, Up,    up_pressed);
+        ops->set_button(back_buffer, Down,  down_pressed);
+        ops->set_button(back_buffer, Left,  left_pressed);
+        ops->set_button(back_buffer, Right, right_pressed);
 
-        ops->set_left_stick(g_hid_double_buffer.back_buffer, left_stick_x, left_stick_y);
-        ops->set_right_stick(g_hid_double_buffer.back_buffer, right_stick_x, right_stick_y);
+        ops->set_left_stick(back_buffer, left_stick_x, left_stick_y);
+        ops->set_right_stick(back_buffer, right_stick_x, right_stick_y);
 
         /* TODO: After introducing HID bridge, replace direct back_buffer access
          * with bridge API or mark rsp as HID packet so the router can set
-         * swap_request uniformly. Currently the caller must set
-         * g_hid_double_buffer.swap_request = 1 after protocol_route(). */
+         * swap_request uniformly. Currently the caller must call
+         * g_controller.ops->request_swap(&g_controller) after protocol_route(). */
     }
 
     rsp->len = 0;

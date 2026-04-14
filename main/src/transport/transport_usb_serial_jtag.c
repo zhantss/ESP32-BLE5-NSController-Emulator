@@ -1,5 +1,7 @@
 #include "transport/transport_usb_serial_jtag.h"
 
+#ifdef CONFIG_TRANSPORT_LAYER_USB_SERIAL_JTAG
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -311,3 +313,5 @@ static bool transport_usb_serial_jtag_is_ready(void *instance)
 
   return (ctx != NULL) && ctx->opened && usb_serial_jtag_is_connected();
 }
+
+#endif // CONFIG_TRANSPORT_LAYER_USB_SERIAL_JTAG

@@ -1,5 +1,7 @@
 #include "transport/transport_uart.h"
 
+#ifdef CONFIG_TRANSPORT_LAYER_UART
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -323,4 +325,6 @@ static bool transport_uart_is_ready(void *instance)
 
   return (ctx != NULL) && ctx->opened;
 }
+
+#endif // CONFIG_TRANSPORT_LAYER_UART
 

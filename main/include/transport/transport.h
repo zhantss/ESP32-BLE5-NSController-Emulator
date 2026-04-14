@@ -53,6 +53,9 @@ typedef struct {
     uint64_t stats_rx_overflow;
 } transport_handle_t;
 
+int transport_init(void);
+int transport_start(void);
+
 #ifdef __cplusplus
 }
 #endif

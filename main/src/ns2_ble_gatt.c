@@ -1,7 +1,7 @@
 #include "device.h"
 #include "pro2.h"
 #include "ns2_ble_gatt.h"
-#include "hid_pro2.h"
+#include "controller/hid_controller_pro2.h"
 #include "utils.h"
 
 #include "host/ble_att.h"
