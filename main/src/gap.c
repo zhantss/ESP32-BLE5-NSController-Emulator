@@ -50,7 +50,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
           log_print_addr(g_console_ns2.ble_addr.val);
         } else {
           ESP_LOGE(LOG_BLE_GAP, "device not ready, reset device");
-          g_device_status = DEV_BOOT;
+          device_status_set(DEV_BOOT);
         }
         // cancel pending restart advertising timer
         if (s_restart_adv_timer != NULL) {
@@ -121,7 +121,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       
       // 0x000e init hid report
       if (event->subscribe.attr_handle == 0x000e && event->subscribe.cur_notify == 1) {
-        g_device_status = DEV_READY;
+        device_status_set(DEV_READY);
         g_hid_controller.ops->start_task(&g_hid_controller);
       }
       break;

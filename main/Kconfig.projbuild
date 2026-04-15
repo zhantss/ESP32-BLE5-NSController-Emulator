@@ -75,4 +75,15 @@ menu "NSController Configuration"
             Lower values provide lower latency but require more CPU processing.
             For ESP32-C61 (single-core), 20ms is recommended to avoid mbuf allocation failures.
 
+    config RGB_LED_GPIO_PIN
+        int "RGB LED GPIO Pin"
+        default 8 if IDF_TARGET_ESP32C61
+        default 8 if IDF_TARGET_ESP32C6
+        default 48 if IDF_TARGET_ESP32S3
+        default 8
+        help
+            GPIO number for the addressable RGB LED (WS2812/SK68XX).
+            ESP32-C61-DevKitC-1 uses GPIO8.
+            ESP32-S3-DevKitC-1 v1.0 uses GPIO48, v1.1 uses GPIO38.
+
 endmenu

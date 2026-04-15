@@ -5,6 +5,7 @@
 #include "device.h"
 #include "controller/hid_controller.h"
 #include "transport/transport.h"
+#include "protocol/protocol.h"
 #include "ns2_codec.h"
 
 void app_main(void)
@@ -14,6 +15,8 @@ void app_main(void)
         esp_log_level_set(LOG_APP, ESP_LOG_DEBUG);
         esp_log_level_set(LOG_BLE_GAP, ESP_LOG_DEBUG);
         esp_log_level_set(LOG_BLE_GATT, ESP_LOG_DEBUG);
+        esp_log_level_set(LOG_PROTOCOL, ESP_LOG_DEBUG);
+        esp_log_level_set(LOG_TRANSPORT, ESP_LOG_DEBUG);
     #endif
     ESP_LOGI(LOG_APP, "Nintendo Switch Controller Emulator");
     ESP_LOGI(LOG_APP, "Starting initialization...");

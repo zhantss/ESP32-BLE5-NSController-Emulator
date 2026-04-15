@@ -16,6 +16,8 @@ extern "C" {
   #define MAX_PROTOCOL_PARSERS 16
 #endif
 
+#define LOG_PROTOCOL "protocol_layer"
+
 typedef enum {
     PARSE_OK = 0,
     PARSE_NEED_MORE,

@@ -78,8 +78,8 @@ int pro2_device_init(nvs_handle_t nvs_handle) {
         highlight_color,
         grip_color
     );
-    g_controller_firmware.manufacturer_data[6] = 0x69;
-    g_controller_firmware.manufacturer_data[7] = 0x20;
+    g_controller_firmware.manufacturer_data[7] = 0x69;
+    g_controller_firmware.manufacturer_data[8] = 0x20;
 
     return ret;
 }

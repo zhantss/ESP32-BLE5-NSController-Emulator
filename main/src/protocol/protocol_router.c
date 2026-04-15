@@ -1,5 +1,7 @@
 #include "protocol/protocol.h"
 
+#include "esp_log.h"
+
 parse_result_t protocol_route(protocol_instance_t *inst,
                                      zc_ringbuf_t *rb,
                                      parser_rsp_t *rsp)
@@ -34,6 +36,8 @@ parse_result_t protocol_route(protocol_instance_t *inst,
             continue;
         }
 
+        ESP_LOGD(LOG_PROTOCOL, "probing parser %s", parser->ops->name);
+
         if (parser->ops->probe(parser->state,
                                head_ptr, head_len,
                                wrap_ptr, wrap_len)) {
@@ -43,6 +47,8 @@ parse_result_t protocol_route(protocol_instance_t *inst,
                 }
                 return PARSE_INVALID;
             }
+
+            ESP_LOGD(LOG_PROTOCOL, "parser %s accepted frame", parser->ops->name);
 
             parse_result_t result = parser->ops->parse_frame(parser->state, rb, rsp);
             if (result == PARSE_INVALID && parser->ops->reset) {

@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#define LOG_TRANSPORT "transport_layer"
+
 typedef struct {
   const char *name;
   int (*open)(void *instance, void *config);

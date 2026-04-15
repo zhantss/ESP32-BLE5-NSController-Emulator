@@ -34,12 +34,13 @@
 typedef enum DEVICE_STATUS {
     DEV_BOOT,           // esp device boot
     DEV_ADV_IND,        // ble adv started
-    DEV_CONNECT_IND,    // ble connected
-    DEV_PAIRING,        // ble pairing
     DEV_READY,          // ble paired, ready for hid
 } device_status_t;
 
 extern device_status_t g_device_status;
+
+// Set device status and update LED indicator accordingly
+void device_status_set(device_status_t status);
 
 // **************** BLE Stack ****************
 

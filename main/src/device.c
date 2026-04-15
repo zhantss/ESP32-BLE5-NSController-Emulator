@@ -2,6 +2,7 @@
 #include "pro2.h"
 #include "utils.h"
 #include "controller/controller.h"
+#include "led_indicator.h"
 
 #include "esp_mac.h"
 #include "esp_err.h"
@@ -17,6 +18,11 @@
 #include "host/util/util.h"
 
 device_status_t g_device_status = DEV_BOOT;
+
+void device_status_set(device_status_t status) {
+  g_device_status = status;
+  led_indicator_set_status(status);
+}
 
 struct ble_store_value_sec* g_ltk_sec = NULL;
 
@@ -106,6 +112,8 @@ void host_task(void *param) {
 }
 
 void ble_stack_init(void) {
+    led_indicator_init(CONFIG_RGB_LED_GPIO_PIN);
+
     esp_err_t ret;
     nvs_init();
 
@@ -180,7 +188,7 @@ static void ble_advertise_normal() {
     ESP_LOGE(LOG_APP, "Joycon not implemented");
     return;
   }
-  g_device_status = DEV_ADV_IND;
+  device_status_set(DEV_ADV_IND);
 
   if (ble_gap_adv_active()) {
     ESP_LOGI(LOG_APP, "Advertising instance already active");
@@ -235,7 +243,7 @@ void ble_advertise() {
     ESP_LOGE(LOG_APP, "Joycon not implemented");
     return;
   }
-  g_device_status = DEV_ADV_IND;
+  device_status_set(DEV_ADV_IND);
 
   // only one instance advertising
   if (ble_gap_ext_adv_active(instance)) {
@@ -284,6 +292,8 @@ void ble_advertise() {
   // TODO test wakeup flag
   if (g_adv_opcode != 0x00) {
     g_controller_firmware.manufacturer_data[11] = g_adv_opcode;
+    // restart adv must set ns2 addr
+    memcpy(&g_controller_firmware.manufacturer_data[12], g_console_ns2.ble_addr.val, ESP_BD_ADDR_LEN);
   }
   memcpy(m_data + sizeof(m_head) + sizeof(m_spec), g_controller_firmware.manufacturer_data, sizeof(g_controller_firmware.manufacturer_data));
 

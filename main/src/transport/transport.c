@@ -20,8 +20,6 @@
 #include "protocol/easycon/easycon_instance.h"
 #endif
 
-#define TAG "transport"
-
 /*
  * Ring-buffer size rationale:
  * - Typical host reports are ~10 bytes (buttons + sticks).
@@ -46,16 +44,17 @@ static void transport_protocol_task(void *arg)
 {
     (void)arg;
 
-    ESP_LOGI(TAG, "Protocol dispatcher task started");
+    ESP_LOGI(LOG_TRANSPORT, "Protocol dispatcher task started");
 
     while (1) {
-        if (g_protocol_inst == NULL || g_transport.ops == NULL) {
-            vTaskDelay(pdMS_TO_TICKS(10));
+        if (g_protocol_inst == NULL || g_transport.ops == NULL || !g_transport.ops->is_ready(&g_transport)) {
+            vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
 
         parser_rsp_t rsp = {0};
         parse_result_t result = protocol_route(g_protocol_inst, &g_transport_rx_ringbuf, &rsp);
+        ESP_LOGD(LOG_TRANSPORT, "Protocol route result: %d", result);
 
         if (result == PARSE_OK) {
             if (rsp.len > 0 && g_transport.ops->submit_tx != NULL) {
@@ -63,7 +62,7 @@ static void transport_protocol_task(void *arg)
             }
         } else if (result == PARSE_NEED_MORE) {
             /* No complete frame yet; yield to let the RX task fill the buffer. */
-            vTaskDelay(pdMS_TO_TICKS(2));
+            vTaskDelay(2);
         } else {
             /* PARSE_INVALID: no parser matched or frame error.
              * Yield briefly to avoid tight spinning on garbage data.
@@ -79,7 +78,7 @@ int transport_init(void)
     memset(g_transport_rx_buffer, 0, sizeof(g_transport_rx_buffer));
 
     if (zc_init(&g_transport_rx_ringbuf, g_transport_rx_buffer, TRANSPORT_RX_BUF_SIZE, 0) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize transport RX ring buffer");
+        ESP_LOGE(LOG_TRANSPORT, "Failed to initialize transport RX ring buffer");
         return -1;
     }
 
@@ -87,7 +86,7 @@ int transport_init(void)
     g_protocol_inst = &easycon_protocol_instance;
 #else
     g_protocol_inst = NULL;
-    ESP_LOGW(TAG, "No protocol instance available for current configuration");
+    ESP_LOGW(LOG_TRANSPORT, "No protocol instance available for current configuration");
 #endif
 
 #ifdef CONFIG_TRANSPORT_LAYER_UART
@@ -104,17 +103,17 @@ int transport_init(void)
     };
 
     if (g_transport.ops->open(&g_transport, &uart_cfg) != 0) {
-        ESP_LOGE(TAG, "Failed to open UART transport");
+        ESP_LOGE(LOG_TRANSPORT, "Failed to open UART transport");
         return -1;
     }
 
     if (g_transport.ops->activate_rx(&g_transport, &g_transport_rx_ringbuf) != 0) {
-        ESP_LOGE(TAG, "Failed to activate UART RX");
+        ESP_LOGE(LOG_TRANSPORT, "Failed to activate UART RX");
         g_transport.ops->close(&g_transport);
         return -1;
     }
 
-    ESP_LOGI(TAG, "UART transport initialized");
+    ESP_LOGI(LOG_TRANSPORT, "UART transport initialized");
 #elif CONFIG_TRANSPORT_LAYER_USB_SERIAL_JTAG
     g_transport.ops = &transport_usb_serial_jtag_vtable;
 
@@ -125,19 +124,19 @@ int transport_init(void)
     };
 
     if (g_transport.ops->open(&g_transport, &usj_cfg) != 0) {
-        ESP_LOGE(TAG, "Failed to open USB Serial/JTAG transport");
+        ESP_LOGE(LOG_TRANSPORT, "Failed to open USB Serial/JTAG transport");
         return -1;
     }
 
     if (g_transport.ops->activate_rx(&g_transport, &g_transport_rx_ringbuf) != 0) {
-        ESP_LOGE(TAG, "Failed to activate USB Serial/JTAG RX");
+        ESP_LOGE(LOG_TRANSPORT, "Failed to activate USB Serial/JTAG RX");
         g_transport.ops->close(&g_transport);
         return -1;
     }
 
-    ESP_LOGI(TAG, "USB Serial/JTAG transport initialized");
+    ESP_LOGI(LOG_TRANSPORT, "USB Serial/JTAG transport initialized");
 #else
-    ESP_LOGE(TAG, "No transport layer selected in configuration");
+    ESP_LOGE(LOG_TRANSPORT, "No transport layer selected in configuration");
     return -1;
 #endif
 
@@ -147,7 +146,7 @@ int transport_init(void)
 int transport_start(void)
 {
     if (g_transport_protocol_task != NULL) {
-        ESP_LOGW(TAG, "Protocol dispatcher task already started");
+        ESP_LOGW(LOG_TRANSPORT, "Protocol dispatcher task already started");
         return 0;
     }
 
@@ -155,13 +154,13 @@ int transport_start(void)
                                 "transport_proto",
                                 4096,
                                 NULL,
-                                2,
+                                4,
                                 &g_transport_protocol_task);
     if (rc != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create protocol dispatcher task");
+        ESP_LOGE(LOG_TRANSPORT, "Failed to create protocol dispatcher task");
         return -1;
     }
 
-    ESP_LOGI(TAG, "Protocol dispatcher task started");
+    ESP_LOGI(LOG_TRANSPORT, "Protocol dispatcher task started");
     return 0;
 }
