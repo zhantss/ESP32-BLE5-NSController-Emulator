@@ -16,6 +16,10 @@
 #include "transport/transport_usb_serial_jtag.h"
 #endif
 
+#ifdef CONFIG_TRANSPORT_LAYER_USB_CDC
+#include "transport/transport_usb_cdc.h"
+#endif
+
 #ifdef CONFIG_PROTOCOL_LAYER_EASYCON
 #include "protocol/easycon/easycon_instance.h"
 #endif
@@ -135,6 +139,27 @@ int transport_init(void)
     }
 
     ESP_LOGI(LOG_TRANSPORT, "USB Serial/JTAG transport initialized");
+#elif CONFIG_TRANSPORT_LAYER_USB_CDC
+    g_transport.ops = &transport_usb_cdc_vtable;
+
+    transport_usb_cdc_config_t usb_cdc_cfg = {
+        .rx_buffer_size = TRANSPORT_RX_BUF_SIZE,
+        .tx_buffer_size = TRANSPORT_TX_BUF_SIZE,
+        .notify_task    = NULL,
+    };
+
+    if (g_transport.ops->open(&g_transport, &usb_cdc_cfg) != 0) {
+        ESP_LOGE(LOG_TRANSPORT, "Failed to open USB CDC transport");
+        return -1;
+    }
+
+    if (g_transport.ops->activate_rx(&g_transport, &g_transport_rx_ringbuf) != 0) {
+        ESP_LOGE(LOG_TRANSPORT, "Failed to activate USB CDC RX");
+        g_transport.ops->close(&g_transport);
+        return -1;
+    }
+
+    ESP_LOGI(LOG_TRANSPORT, "USB CDC transport initialized");
 #else
     ESP_LOGE(LOG_TRANSPORT, "No transport layer selected in configuration");
     return -1;
@@ -150,12 +175,23 @@ int transport_start(void)
         return 0;
     }
 
-    BaseType_t rc = xTaskCreate(transport_protocol_task,
-                                "transport_proto",
-                                4096,
-                                NULL,
-                                4,
-                                &g_transport_protocol_task);
+    BaseType_t rc;
+#if CONFIG_IDF_TARGET_ESP32S3
+    rc = xTaskCreatePinnedToCore(transport_protocol_task,
+                                 "transport_proto",
+                                 4096,
+                                 NULL,
+                                 4,
+                                 &g_transport_protocol_task,
+                                 1);
+#else
+    rc = xTaskCreate(transport_protocol_task,
+                     "transport_proto",
+                     4096,
+                     NULL,
+                     4,
+                     &g_transport_protocol_task);
+#endif
     if (rc != pdPASS) {
         ESP_LOGE(LOG_TRANSPORT, "Failed to create protocol dispatcher task");
         return -1;

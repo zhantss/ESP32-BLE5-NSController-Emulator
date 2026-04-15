@@ -173,8 +173,17 @@ static int controller_start_task_impl(controller_handle_t *ctrl) {
         ESP_LOGE(LOG_HID, "controller not initialized");
         return -1;
     }
-
+#if CONFIG_IDF_TARGET_ESP32S3
+    BaseType_t rc = xTaskCreatePinnedToCore(controller_task,
+                                 "controller_task",
+                                 4096,
+                                 ctrl,
+                                 4,
+                                 &ctrl->task_handle,
+                                 tskNO_AFFINITY);
+#else
     BaseType_t rc = xTaskCreate(controller_task, "controller_task", 4096, ctrl, 4, &ctrl->task_handle);
+#endif
     if (rc != pdPASS) {
         ESP_LOGE(LOG_HID, "create controller report task failed, rc: %d", rc);
         return -1;

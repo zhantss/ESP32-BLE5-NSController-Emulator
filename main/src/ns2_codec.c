@@ -488,8 +488,8 @@ static uint8_t cmd_0x15_handler(const uint8_t subcmd, const uint16_t payload_len
             return 0x00;
         // paring finished
         case 0x03:
-            // 00
-            if (data_in[9] == 0x00) {
+            // TODO 00 ? before index 9 ? WHY 8?
+            if (data_in[8] == 0x00) {
                 rc = controller_pairing_info_save();
                 rc += inject_pairing_info_to_ble_ctx();
 

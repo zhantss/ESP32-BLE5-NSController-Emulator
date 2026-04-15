@@ -29,12 +29,21 @@ menu "NSController Configuration"
                 Use USB Serial/JTAG controller for communication.
                 Device will appear as /dev/ttyACM0 on Linux.
                 Note: Ensure console is set to UART0 when using this option.
+
+        config TRANSPORT_LAYER_USB_CDC
+            bool "USB CDC (Virtual Serial, ESP32-S3)"
+            depends on IDF_TARGET_ESP32S3
+            help
+                Use USB OTG CDC ACM for communication.
+                Device will appear as a virtual serial port (/dev/ttyACM0 on Linux).
+                Note: Ensure console is set to UART0 when using this option.
     endchoice
 
     config TRANSPORT_LAYER
         int
         default 0 if TRANSPORT_LAYER_UART
         default 1 if TRANSPORT_LAYER_USB_SERIAL_JTAG
+        default 2 if TRANSPORT_LAYER_USB_CDC
 
     choice PROTOCOL_LAYER_CHOICE
         prompt "Protocol Layer"
