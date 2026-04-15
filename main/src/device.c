@@ -2,7 +2,6 @@
 #include "pro2.h"
 #include "utils.h"
 #include "controller/controller.h"
-#include "led_indicator.h"
 
 #include "esp_mac.h"
 #include "esp_err.h"
@@ -21,7 +20,6 @@ device_status_t g_device_status = DEV_BOOT;
 
 void device_status_set(device_status_t status) {
   g_device_status = status;
-  led_indicator_set_status(status);
 }
 
 struct ble_store_value_sec* g_ltk_sec = NULL;
@@ -112,8 +110,6 @@ void host_task(void *param) {
 }
 
 void ble_stack_init(void) {
-    led_indicator_init(CONFIG_RGB_LED_GPIO_PIN);
-
     esp_err_t ret;
     nvs_init();
 
