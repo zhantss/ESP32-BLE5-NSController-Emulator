@@ -39,7 +39,7 @@ typedef enum DEVICE_STATUS {
 
 extern device_status_t g_device_status;
 
-// Set device status and update LED indicator accordingly
+// Set device status
 void device_status_set(device_status_t status);
 
 // **************** BLE Stack ****************
