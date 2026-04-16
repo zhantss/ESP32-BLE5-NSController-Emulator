@@ -1,5 +1,6 @@
 # project
 scripts/.backup
+.backup/
 
 # vscode
 .vscode/
