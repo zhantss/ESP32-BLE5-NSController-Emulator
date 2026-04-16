@@ -10,6 +10,8 @@
 #include "driver/usb_serial_jtag.h"
 #include "esp_log.h"
 
+#include "soc/usb_serial_jtag_struct.h"
+
 #define TAG "transport_usb_serial_jtag"
 
 #define USJ_RX_TIMEOUT_MS   10
@@ -123,6 +125,10 @@ static int transport_usb_serial_jtag_open(void *instance, void *config)
     .rx_buffer_size = ctx->config.rx_buffer_size,
     .tx_buffer_size = ctx->config.tx_buffer_size,
   };
+
+  // disable chip reset from usb serial channel to reset chip
+  USB_SERIAL_JTAG.chip_rst.usb_uart_chip_rst_dis = 1;
+  USB_SERIAL_JTAG.config_update.config_update = 1;
 
   esp_err_t err = usb_serial_jtag_driver_install(&driver_cfg);
   if (err != ESP_OK) {

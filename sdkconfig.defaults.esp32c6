@@ -1,7 +1,18 @@
 # This file was generated using idf.py save-defconfig. It can be edited manually.
 # Espressif IoT Development Framework (ESP-IDF) Project Minimal Configuration
 #
+CONFIG_IDF_TARGET="esp32c6"
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
-CONFIG_BT_NIMBLE_HCI_EVT_BUF_SIZE=70
-CONFIG_BT_NIMBLE_EXT_ADV=y
+
+# use jtag for transport layer
+CONFIG_TRANSPORT_LAYER_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# C6 single-core: use 20ms interval to avoid mbuf allocation failures
+CONFIG_HID_REPORT_INTERVAL=20
+
+# FLASH
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_n2c.csv"
