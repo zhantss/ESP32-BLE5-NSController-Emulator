@@ -1,5 +1,7 @@
 # ESP32-BLE5-NSController-Emulator
 
+[English](README.en.md)
+
 ## 项目概述
 
 本项目是一个在 **ESP32 系列设备** 上模拟 **Nintendo Switch Pro2 手柄**，并连接 **Nintendo Switch2 (NS2)** 的开源项目。通过逆向工程 NS2 的私有 BLE 协议，实现了在 ESP32 上作为合法手柄设备与 NS2 主机配对和通信的能力。
