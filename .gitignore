@@ -2,6 +2,7 @@
 scripts/.backup
 .backup/
 release/
+TODO.md
 
 # vscode
 .vscode/
