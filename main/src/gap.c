@@ -74,7 +74,7 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
       }
       return 0;
     case BLE_GAP_EVENT_DISCONNECT:
-      ESP_LOGI(LOG_BLE_GAP, "disconnected, reason=%d, restart advertising after 30s", event->disconnect.reason);
+      ESP_LOGI(LOG_BLE_GAP, "disconnected, reason=%d, restart advertising after 5s", event->disconnect.reason);
       if (s_restart_adv_timer == NULL) {
         s_restart_adv_timer = xTimerCreate("restart_adv", pdMS_TO_TICKS(3000), pdFALSE, NULL, restart_adv_timer_cb);
       }
