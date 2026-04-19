@@ -3,6 +3,7 @@ scripts/.backup
 .backup/
 release/
 TODO.md
+dependencies.lock
 
 # vscode
 .vscode/
