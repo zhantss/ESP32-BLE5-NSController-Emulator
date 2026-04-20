@@ -9,7 +9,7 @@ The project adopts a **modular design**, supporting custom Transport Layer and P
 ## Features
 
 - **Complete Nintendo Switch Pro2 controller emulation**: Supports all buttons and joystick operations
-- **NS2 BLE protocol stack**: Fully implements NS2 controller pairing, authentication, data encryption, and other processes
+- **NS2 BLE protocol stack**: Emulates the observable behavior of NS2 controller communication, including pairing, authentication, and data formatting
 - **Modular architecture**:
   - **Transport Layer**: Supports UART, USB Serial/JTAG, BLE HID, and other physical transmission methods
   - **Protocol Layer**: Supports custom binary protocols, currently compatible with some features of the [EasyCon](https://github.com/EasyConNS/EasyCon) controller
@@ -25,7 +25,7 @@ The project adopts a **modular design**, supporting custom Transport Layer and P
 - **ESP32-C3**  ❌ Slow progress due to closed-source NimBLE stack
 
 ### Bluetooth Stack Requirements
-This project is developed based on the **ESP-IDF** framework. Theoretically, any ESP-IDF firmware using the Apache NimBLE open-source stack can be supported. However, since NS2's private protocol exceeds the BLE specification for minimum connection interval (standard minimum is 7.5ms, NS2 requires 5ms), modifications to the NimBLE stack are required.
+This project is developed based on the **ESP-IDF** framework. Theoretically, any ESP-IDF firmware using the Apache NimBLE open-source stack can be supported. However, since NS2's controller communication protocol exceeds the BLE specification for minimum connection interval (standard minimum is 7.5ms, NS2 requires 5ms), modifications to the NimBLE stack are required.
 
 ## Quick Start
 
@@ -84,7 +84,7 @@ idf.py -p PORT flash monitor
 │   │   └── buffer/       # Zero-copy buffers
 │   └── include/          # Header files
 └── patch/                # Stack patch files
-    └── esp32c61/         # C61 precompiled patches
+    └── patch_nimble_lib.py   # NimBLE Protocol Stack Patch Script
 ```
 
 ### Adding New Transport Layer
@@ -109,7 +109,7 @@ idf.py menuconfig
 ## Patch Information
 
 ### Patch Background
-The Nintendo Switch 2 requires a BLE connection interval of 5ms, which falls below the minimum standard limit of 7.5ms specified in official BLE specifications. This project is exclusively for academic research and educational use, investigating the performance boundaries of BLE 5.0 and interoperability with non-standard compliant devices. To achieve this connection interval on ESP32-C6/C61 chips, fixed constant parameters within the NimBLE BLE stack of the ESP-IDF framework must be modified.
+The Nintendo Switch 2 requires a BLE connection interval of 5ms, which falls below the minimum standard limit of 7.5ms specified in official BLE specifications. This project is exclusively for academic research and educational use, investigating the performance boundaries of BLE 5.0 and interoperability with devices that use non-standard connection parameters. To achieve this connection interval on ESP32-C6/C61 chips, fixed constant parameters within the NimBLE BLE stack of the ESP-IDF framework must be modified.
 
 ### How the Patch Works (Apache 2.0 Compliant)
 - This project does **not** distribute any modified precompiled binaries or proprietary closed-source code. It only provides a tool that operates on your local official ESP-IDF development framework. The patch workflow is as follows:
@@ -191,7 +191,6 @@ This project is for learning and research purposes only. Using this project may 
 - Initial version release
 - Support ESP32-C61 as NS2 Pro2 controller emulation
 - Implement basic transport and protocol layer framework
-- Provide precompiled patch files
 
 ### v0.1.1 (2026-04)
 - Reduced the advertising restart interval after disconnection
