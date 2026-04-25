@@ -50,7 +50,8 @@ int handle_gap_event(struct ble_gap_event* event, void* arg) {
           log_print_addr(g_console_ns2.ble_addr.val);
           struct ble_gap_upd_params params;
           memset(&params, 0, sizeof(params));
-          params.itvl_min = desc.conn_itvl;
+          // ESP-IDF 5.5.3, maybe esp-idf support min connection interval
+          params.itvl_min = 6;
           params.itvl_max = desc.conn_itvl;
           params.latency = 0;
           params.supervision_timeout = desc.supervision_timeout;
