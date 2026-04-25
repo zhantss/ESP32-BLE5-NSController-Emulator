@@ -49,8 +49,8 @@ static const tusb_desc_device_t usb_device_descriptor = {
     .bDeviceSubClass    = 0x02,          /* MISC_SUBCLASS_COMMON */
     .bDeviceProtocol    = 0x01,          /* MISC_PROTOCOL_IAD */
     .bMaxPacketSize0    = 64,            /* CFG_TUD_ENDPOINT0_SIZE */
-    .idVendor           = 0x057E,        /* Nintendo */
-    .idProduct          = 0x2069,        /* Pro2 */
+    .idVendor           = 0x0777,        /* customer */
+    .idProduct          = 0x0777,        /* customer controller */
     .bcdDevice          = 0x0100,        /* Device version: no data available, using 1.00 */
     .iManufacturer      = 0x01,
     .iProduct           = 0x02,
@@ -60,9 +60,10 @@ static const tusb_desc_device_t usb_device_descriptor = {
 
 static const char *usb_string_descriptor[] = {
     (const char[]){0x09, 0x04}, /* 0: Language ID (English US) */
-    "Nintendo",                  /* 1: Manufacturer */
-    "Pro2",                      /* 2: Product */
-    "000000",                    /* 3: Serial number -- no data in manufacturer_data, placeholder */
+    "PITC",                     /* 1: Manufacturer */
+    "Pro2 Controller",          /* 2: Product */
+    "000000",                   /* 3: Serial number -- no data in manufacturer_data, placeholder */
+    "CDC",                      /* 4: CDC Interface (required by default CDC config descriptor) */
 };
 
 /* -------------------------------------------------------------------------- */
@@ -95,13 +96,24 @@ static void transport_usb_cdc_rx_task(void *arg)
   transport_usb_cdc_ctx_t *ctx = (transport_usb_cdc_ctx_t *)arg;
   transport_handle_t      *tp  = ctx->tp;
   bool was_connected = false;
+  uint32_t disconnect_ticks = 0;
+  const uint32_t DISCONNECT_DEBOUNCE_TICKS = 20; /* 20 * 10 ms = 200 ms */
 
   while (ctx->running) {
-    if (!tud_cdc_connected()) {
-      was_connected = false;
+    /* Use tud_mounted() instead of tud_cdc_connected() so that
+       hosts which do not assert DTR (e.g. EasyCon) can still
+       communicate.  tud_cdc_connected() returns false when DTR
+       is de-asserted, which blocks RX/TX entirely. */
+    if (!tud_mounted()) {
+      if (disconnect_ticks < DISCONNECT_DEBOUNCE_TICKS) {
+        disconnect_ticks++;
+      } else {
+        was_connected = false;
+      }
       vTaskDelay(pdMS_TO_TICKS(10));
       continue;
     }
+    disconnect_ticks = 0;
 
     if (!was_connected && tp->rx_buffer != NULL) {
       zc_reset(tp->rx_buffer);
@@ -118,7 +130,7 @@ static void transport_usb_cdc_rx_task(void *arg)
       if (err == ESP_OK && drain_len > 0) {
         tp->stats_rx_overflow += (uint32_t)drain_len;
       }
-      vTaskDelay(pdMS_TO_TICKS(1));
+      vTaskDelay(1);
       continue;
     }
 
@@ -132,9 +144,18 @@ static void transport_usb_cdc_rx_task(void *arg)
       if (ctx->config.notify_task != NULL) {
         xTaskNotifyGive(ctx->config.notify_task);
       }
+
+      /* Prevent task watchdog starvation during high-speed RX bursts.
+         Only delay every N packets so throughput stays high; if data is
+         sparse the delay does not matter. */
+      static uint8_t yield_cnt = 0;
+      if (++yield_cnt >= 8) {
+        yield_cnt = 0;
+        vTaskDelay(1);  /* one tick == 10 ms @ 100 Hz */
+      }
     } else {
       /* Yield briefly when no data to prevent busy-looping. */
-      vTaskDelay(pdMS_TO_TICKS(1));
+      vTaskDelay(1);
     }
   }
 
@@ -351,8 +372,8 @@ static int transport_usb_cdc_submit_tx(void *instance, const uint8_t *data, uint
     return -1;
   }
 
-  if (!tud_cdc_connected()) {
-    ESP_LOGW(TAG, "USB CDC not connected to host");
+  if (!tud_mounted()) {
+    ESP_LOGW(TAG, "USB CDC not mounted");
     return -1;
   }
 
@@ -402,7 +423,7 @@ static bool transport_usb_cdc_is_ready(void *instance)
   transport_handle_t      *tp  = (transport_handle_t *)instance;
   transport_usb_cdc_ctx_t *ctx = (transport_usb_cdc_ctx_t *)tp->hardware_ctx;
 
-  return (ctx != NULL) && ctx->opened && tud_cdc_connected();
+  return (ctx != NULL) && ctx->opened && tud_mounted();
 }
 
 #endif // CONFIG_TRANSPORT_LAYER_USB_CDC

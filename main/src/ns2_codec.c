@@ -22,7 +22,7 @@ static uint8_t flash_mem_013000[] = {
     0x7E, 0x05, 
     // Product ID, Pro2 Controller
     0x69, 0x20, 
-    // Unknow, Version/Edition?
+    // Unknow
     0x01, 0x06, 0x01,
     // Body Color
     0x23, 0x23, 0x23,

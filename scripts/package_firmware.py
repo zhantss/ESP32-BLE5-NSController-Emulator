@@ -55,7 +55,7 @@ def extract_flash_size_from_args(flash_args_lines):
     """
     for line in flash_args_lines:
         # Look for --flash_size parameter
-        match = re.search(r'--flash_size\s+(\d+)(MB|M|mb|m)', line, re.IGNORECASE)
+        match = re.search(r'--flash-size\s+(\d+)(MB|M|mb|m)', line, re.IGNORECASE)
         if match:
             try:
                 return int(match.group(1))
