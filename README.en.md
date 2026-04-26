@@ -19,10 +19,10 @@ The project adopts a **modular design**, supporting custom Transport Layer and P
 ## Hardware Support
 
 ### Tested ESP32 Models
-- **ESP32-C61** ✅ Fully tested, stable connection
-- **ESP32-C6**  ✅ Basic tests passed, stable connection
-- **ESP32-S3**  ❌ Slow progress due to closed-source NimBLE stack
-- **ESP32-C3**  ❌ Slow progress due to closed-source NimBLE stack
+- **ESP32-C61** ✅ Fully tested, stable connection  
+- **ESP32-C6**  ✅ Basic tests passed, stable connection  
+- **ESP32-S3**  ⚠️ Patch files have been officially provided by Espressif on the main branch. Basic tests have been completed, delivering stable Bluetooth connection performance  
+
 
 ### Bluetooth Stack Requirements
 This project is developed based on the **ESP-IDF** framework. Theoretically, any ESP-IDF firmware using the Apache NimBLE open-source stack can be supported. However, since NS2's controller communication protocol exceeds the BLE specification for minimum connection interval (standard minimum is 7.5ms, NS2 requires 5ms), modifications to the NimBLE stack are required.
@@ -120,7 +120,9 @@ Legitimate Source Analysis: We studied the underlying implementation of BLE conn
 ### Current Status
 - **ESP32-C61** ✅ Patch tested successfully, stable connection
 - **ESP32-C6**  ✅ Patch tested successfully, stable connection
-- **Other models** ⚠️ Theoretically all models using Apache NimBLE open-source stack are supported, but require compiling corresponding patch files for different models
+- **ESP32-S3**  ⚠️ Patch files provided by Espressif on the main branch have passed basic tests with stable connections.  
+- **Other models** ⚠️ Please wait for the official stable release. If you are using the version with the Apache NimBLE open-source stack, you may try applying the patch script. For other stacks, please refer to the ESP32-S3 support issue below.  
+
 
 ## Known Issues
 
@@ -129,7 +131,11 @@ The firmware supports automatic reconnection. However, when connecting the contr
 It is not recommended to connect the controller via this interface afterwards. Only enter this interface for initial pairing. After subsequent power-on, the MCU will broadcast automatically and reconnect seamlessly.  
 
 ### ESP32-S3 Support Issues
-Due to ESP32-S3 using a closed-source Bluetooth stack, we cannot directly modify connection parameters. I've submitted related ISSUEs to Espressif, requesting open interfaces or technical support. Current progress is slow and requires community push.
+~~Due to ESP32-S3 using a closed-source Bluetooth stack, we cannot directly modify connection parameters. I've submitted related ISSUEs to Espressif, requesting open interfaces or technical support. Current progress is slow and requires community push.~~  
+The feature is now supported on the main branch of ESP-IDF with patch files provided by Espressif official engineers. The S3 firmware has been officially released in the repository. For custom development, please wait until Espressif merges the relevant features into the stable release branch, or refer to the linked issue to download and apply the patch files for testing.  
+Issue link:  
+[ESP32-S3 Bluedroid Controller Support for 5ms Connection Interval](https://github.com/espressif/esp-idf/issues/18467)  
+Special thanks to the Espressif official team and community contributors for their support.
 
 ### Compatibility Issues
 1. **NS2 System Updates**: Nintendo may change protocols through system updates, causing existing implementations to fail
@@ -187,14 +193,23 @@ This project is for learning and research purposes only. Using this project may 
 
 ## Changelog
 
-### v0.1.0 (2026-04)
-- Initial version release
-- Support ESP32-C61 as NS2 Pro2 controller emulation
-- Implement basic transport and protocol layer framework
+### v0.1.3 (2026-04)
+- Initial support for ESP32-S3  
+- Temporarily block NS2 firmware update pop-up prompts  
+- Fixed minor bugs  
+
+### v0.1.2 (2026-04)
+- Fixed communication failure caused by redundant data on the communication port of certain chips by implementing a packet dropping mechanism  
 
 ### v0.1.1 (2026-04)
-- Reduced the advertising restart interval after disconnection
-- Optimized startup logic of HID report tasks
+- Reduced the advertising restart interval after disconnection  
+- Optimized startup logic of HID report tasks  
+
+### v0.1.0 (2026-04)
+- Initial version release  
+- Support ESP32-C61 as NS2 Pro2 controller emulation  
+- Implement basic transport and protocol layer framework  
+
 ---
 
 **Note**: This project is in early development stage. APIs and functionality may undergo significant changes. Please check changelog and documentation regularly.
