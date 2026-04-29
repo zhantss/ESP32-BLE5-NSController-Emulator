@@ -1,6 +1,6 @@
 # ESP32-BLE5-NSController-Emulator
 
-[English](README.en.md)
+中文 / [English](README.en.md)
 
 ## 项目概述
 
